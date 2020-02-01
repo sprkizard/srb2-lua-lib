@@ -20,7 +20,7 @@
         ({dots = True}) - Toggles the visibility of the from and to points
         ({lines = True}) - Toggles the visibility of the line paths
         ({lineMobj = MT_THOK}) - Changes the object used in rendering lines
-        ({scale = FRACUNIT}) - Changes the object used in rendering lines
+        ({scale = FRACUNIT}) - Changes the line object scale
 
 ]]
 
@@ -29,7 +29,7 @@ rawset(_G, "List_LinePaths", {})
 local LINEPATH_MAX = 512
 
 local FF_FLAT = FF_PAPERSPRITE
-local FF_FLATCOLLIDER = FF_PAPERCOLLISION
+local FF_FLATCOLLIDER = MF_PAPERCOLLISION
 
 -- Minimum freeslot items
 freeslot("MT_LINEPATH", "S_LINEPATH", "SPR_SPLN")
