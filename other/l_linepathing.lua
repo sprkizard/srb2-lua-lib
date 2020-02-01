@@ -1,3 +1,32 @@
+--[[
+
+* l_linepathing.lua
+* (sprkizard)
+* (November ‎29, ‎2019)
+
+* Desc: A function made to copy Unity's Gizmos.DrawLine() method,
+        and imitate using arrays to create a chain of Gizmo lines
+        in the viewport
+        https://docs.unity3d.com/ScriptReference/Gizmos.DrawLine.html
+
+* Usage: R_DrawMobjLine(from, to, params)
+        ------
+        Accepts both mobj coordinates and table xyz coords for
+        from and to destinations
+        ( eg. R_DrawMobjLine(player.mo, mo) )
+
+        params Parameters:
+        ({width = 64}) - The amount of object 'depth' in a line
+        ({dots = True}) - Toggles the visibility of the from and to points
+        ({lines = True}) - Toggles the visibility of the line paths
+        ({lineMobj = MT_THOK}) - Changes the object used in rendering lines
+        ({scale = FRACUNIT}) - Changes the object used in rendering lines
+
+]]
+
+rawset(_G, "List_LinePaths", {})
+
+local LINEPATH_MAX = 512
 
 local FF_FLAT = FF_PAPERSPRITE
 local FF_FLATCOLLIDER = FF_PAPERCOLLISION
@@ -7,6 +36,8 @@ freeslot("MT_LINEPATH", "S_LINEPATH", "SPR_SPLN")
 
 -- Railing Example
 freeslot("MT_FLAT", "S_FLAT", "SPR_RAIL")
+
+
 
 
 mobjinfo[MT_LINEPATH] = {
@@ -37,7 +68,6 @@ mobjinfo[MT_FLAT] = {
 }
 states[S_FLAT] = {SPR_RAIL,0|FF_FLAT,2,A_None,0,0,S_NULL}
 
-rawset(_G, "List_LinePaths", {})
 
 addHook("MapThingSpawn", function(mo, mthing)
 
@@ -59,7 +89,7 @@ addHook("MapThingSpawn", function(mo, mthing)
 end, MT_LINEPATH)
 
 
--- Reset tables on map change
+-- Reset line path tables on map change
 addHook("MapChange", do
     List_LinePaths = {}
 end)
@@ -73,12 +103,6 @@ end
 
 -- Calculate 3D distance (x,y + z height)
 local function R_Distance(p1, p2)
-
-    --local distance_x = to_dest.x - from.x
-    --local distance_y = to_dest.y - from.y
-    --local distance_z = to_dest.z - from.z
-
-    --return FixedSqrt(FixedMul(distance_x, 2) + FixedMul(distance_y, 2) + FixedMul(distance_z, 2))
     return FixedHypot(FixedHypot(p1.x-p2.x, p1.y-p2.y), p1.z-p2.z)
 end
 
@@ -87,7 +111,7 @@ local function R_Distance2D(p1, p2)
     return FixedHypot(p1.x-p2.x, p1.y-p2.y)
 end
 
--- Calculate and draw a line ray to the coordinates specified
+-- Calculate and draw a line to the coordinates specified
 local function R_DrawMobjLine(from, to, params)
 
     -- We want the line casting to be customizable, so we sort out this stuff in a table
@@ -96,6 +120,7 @@ local function R_DrawMobjLine(from, to, params)
     local lines = (params and params.lines == false) and MF2_DONTDRAW or 0
     local lineMobj = params.linemobj or MT_THOK
     local scale = params.scale or FRACUNIT
+    -- TODO: local func(), what if a function could run at the end of each spawn?
 
 
     -- The lower the width, the more depth the line has (eg, more objects)
@@ -127,7 +152,7 @@ local function R_DrawMobjLine(from, to, params)
         from.links[i].scale = scale
         from.links[i].flags2 = lines
 
-        -- 'Attempt' to invert the sprite roll based on view
+        -- '''Attempt''' to invert the sprite roll based on view
         local invert = -1
         if (R_PointToAngle(from.links[i].x, from.links[i].y) > from.links[i].angle)  then
             invert = 1
@@ -165,7 +190,7 @@ addHook("MobjThinker", function(mo)
                     -- as long as it is not another starting point not identical to this set
                     --print("List_LinePaths Index: " .. amnt .. " - has angle of " .. pl_mthing_angle)
 
-                    for i=mo.startid,512 do
+                    for i=mo.startid,LINEPATH_MAX do
                         if ( (pl_mthing_angle == mo.startid+#mo.paths) ) then
                             
                             --print("Path start id [" .. mo.startid .. "] found next path id - ".. amnt)
@@ -181,7 +206,7 @@ addHook("MobjThinker", function(mo)
 
         -- Draw lines from the path list (continuous)
         for i=1,#mo.paths-1 do
-            R_DrawMobjLine(mo.paths[i], mo.paths[i+1], {width = 45, lines = true, dots = false})
+            R_DrawMobjLine(mo.paths[i], mo.paths[i+1], {width = 45, lines = true, dots = true})
             --mo.rollangle = $1 + ANG1
         end
     end
