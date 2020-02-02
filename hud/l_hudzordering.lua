@@ -1,3 +1,25 @@
+--[[
+* l_hudzordering.lua
+* (sprkizard)
+* (November 28, 2018 1:04)
+* Desc: A tiny HUD library made to allow multiple HUD elements with
+	layer priority. Inspired by a script made by fickleheart
+
+* Usage: hudlayer["layer"] = {}
+        ------
+        Table arguments:
+        ({layernum = 1}) - The 'priority' or layer the HUD element sits on.
+        A value of -1 Removes it from view
+
+        ({func = function(v, stplyr, cam)}) - The HUD function to run
+        which can contain HUD elements, strings, etc
+
+        Can also be called with hudlayer["layer"].layernum and hudlayer["layer"].func()
+
+* Depends on:
+	spairs
+]]
+
 -- spairs attribution by:
 -- https://stackoverflow.com/questions/15706270/sort-a-table-in-lua
 -------------------
@@ -27,58 +49,70 @@ local function spairs(t, order)
 end
 
 
-rawset(_G, "z_HUD", {})
-
--- Table indexes
-z_HUD["test1"] = {
-					z_index = 5,
-					dontdraw = false,
-					func = (function(v, stplyr, cam)
-						v.drawString(120, 64, "Layer 5", V_ALLOWLOWERCASE, "left")
-					end)
-				}
-
-z_HUD["test2"] = {
-					z_index = 4, 
-					func = (function(v, stplyr, cam) 
-						v.drawString(126, 66, "Layer 4", V_ALLOWLOWERCASE, "left")
-					end)
-				}
-
-z_HUD["test3"] = {
-					z_index = 9, 
-					func = (function(v, stplyr, cam) 
-						v.drawString(129, 67, "Layer 9", V_ALLOWLOWERCASE, "left")
-					end)
-				}
-z_HUD["testOrder"] = {
-					z_index = 3, 
-					func = (function(v, stplyr, cam) 
-						v.drawString(129, 67, "Layer 999", V_ALLOWLOWERCASE, "left")
-					end)
-			}		
 
 
-local function hudorder(v, stplyr, cam)
-	-- Iterates and sorts through z_HUD with spairs
-	
-	--for k,huditem in spairs(z_HUD, function(t,a,b) return t[b].z_index < t[a].z_index end) do -- desc
-	for k,huditem in spairs(z_HUD, function(t,a,b) return t[a].z_index > t[b].z_index end) do -- asc
+
+-- The container table that holds all user created HUD elements
+rawset(_G, "hudLayer", {})
+
+
+
+-- Some examples
+hudLayer["test1"] = {
+	layernum = 5,
+	func = (function(v, stplyr, cam)
+		v.drawString(120, 64, "Layer 5", V_ALLOWLOWERCASE, "left")
+	end)
+}
+
+hudLayer["test2"] = {
+	layernum = 4,
+	func = (function(v, stplyr, cam) 
+		v.drawString(126, 66, "Layer 4", V_ALLOWLOWERCASE, "left")
+	end)
+}
+
+hudLayer["test3"] = {
+	layernum = 9,
+	func = (function(v, stplyr, cam) 
+		v.drawString(129, 67, "Layer 9", V_ALLOWLOWERCASE, "left")
+	end)
+}
+
+hudLayer["removable"] = {
+	layernum = 3,
+	func = (function(v, stplyr, cam) 
+		v.drawString(129, 67, "Remove me on Jump", V_ALLOWLOWERCASE, "left")
+	end)
+}		
+
+
+-- Iterates and sorts through hudLayer with spairs
+local function sortHudItems(v, stplyr, cam)
+
+	--for k,huditem in spairs(hudLayer, function(t,a,b) return t[b].layernum < t[a].layernum end) do -- desc
+	for _,huditem in spairs(hudLayer, function(t,a,b) return t[a].layernum > t[b].layernum end) do -- asc
+		
 		-- Do not run on indexes with -1 at all.
-		if (huditem.z_index == -1) then return end
+		if (huditem.layernum == -1) then return end
+		
 		-- Run hud functions
 		huditem.func(v, stplyr, cam)
 	end
 end
-hud.add(hudorder, "game")
+hud.add(sortHudItems, "game")
 
-addHook("ThinkFrame", do
 
-	for player in players.iterate
-		if player.cmd.buttons & BT_USE then
+-- Test the addon by removing removable layer, and replacing the text on 'test1'
+addHook("ThinkFrame", function()
+
+	for player in players.iterate do
+		if (player.cmd.buttons & BT_USE) then
 		
-			z_HUD["testOrder"].z_index = -1
-			print(z_HUD["testOrder"].z_index)
+			hudLayer["removable"].layernum = -1
+			hudLayer["test1"].func = (function(v, stplyr, cam)
+				v.drawString(120, 64, "Replaced Text!", V_ALLOWLOWERCASE, "left")
+			end)
 		end
 	end
 end)
