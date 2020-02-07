@@ -20,7 +20,8 @@ local function P_RadiusExplode(source, speed, particleType, params)
     -- Load extra parameters for further customization if needed
     source.skipParam = (params and params.skip) or 32
     source.scaleParam = (params and params.scale) or FRACUNIT
-
+    --source.destscaleParam = (params and params.destscale) or FRACUNIT
+    source.fuseParam = (params and params.fuse) or nil
 
     if (source.valid) then
 
@@ -29,6 +30,11 @@ local function P_RadiusExplode(source, speed, particleType, params)
 
             source.explodeForceFx = P_SpawnMobj(source.x, source.y, source.z, particleType or MT_EXPLODE)
             source.explodeForceFx.scale = source.scaleParam
+
+            -- Set an object fuse if you use something that does not disappear easily
+            if (source.fuseParam) then
+                source.explodeForceFx.fuse = source.fuseParam
+            end
 
             -- Force the objects outward
             P_InstaThrust(source.explodeForceFx, FixedAngle(newAngle), speed*FRACUNIT)
