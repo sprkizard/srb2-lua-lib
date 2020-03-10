@@ -759,3 +759,22 @@ addHook("MobjThinker", function(mo)
 		axis2d.HandleSwitches(mo)
 	end
 end, MT_FLINGRING)
+
+
+-- Reset .movevars on mapchange (if no currentaxis)
+addHook("MapChange", function()
+
+	for player in players.iterate do
+
+		-- salt: extra safety
+		if not (player.mo and player.mo.valid) continue end
+		
+		
+		-- movevars being undefined means nobody moves on a map change when there
+		-- isn't even an axis to use at all..
+		if not player.mo.currentaxis then
+			player.movevars = 1;
+		end
+
+	end
+end)
