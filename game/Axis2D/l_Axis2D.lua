@@ -41,7 +41,7 @@ function axis2d.CheckAxes()
 	if axes.lastmap ~= gamemap then
 		axes = {lastmap = gamemap}
 		print("Preparing Axis2D cache...")
-		for mo in thinkers.iterate("mobj") do
+		for mo in mobjs.iterate() do
 			if mo.type == MT_AXIS then
 				--print("Axis found!")
 				local axisinfo = {}
@@ -309,9 +309,9 @@ local function SetCamera(player, x, y, z)
 end
 
 -- Player management!
-addHook("MobjThinker", function(mo)
+addHook("PlayerThink", function(player)
 
-	local player = mo.player
+	local mo = player.mo
 	
 	if mo.flags2 & MF2_TWOD then
 		SetCamera(player, mo.x, mo.y - 448*FRACUNIT, mo.z + 20*FRACUNIT)
@@ -372,7 +372,7 @@ addHook("MobjThinker", function(mo)
 		axis2d.SnapMobj(mo)
 		
 		-- Handle camera
-		if player.health then -- Don't move the camera when the player's dead!
+		if player.mo.health then -- Don't move the camera when the player's dead!
 			--local factor = 1
 			local camangle = angle
 			if mo.currentaxis.flipped then
@@ -405,7 +405,7 @@ addHook("MobjThinker", function(mo)
 		player.awayviewmobj.momz = 0
 		
 		-- Set player angle
-		if(player.pflags & PF_GLIDING) then
+		if (player.pflags & PF_GLIDING) then
 			local tangle = angle
 			if mo.currentaxis.flipped then
 				tangle = $1^^ANGLE_180
@@ -459,7 +459,9 @@ addHook("MobjThinker", function(mo)
 					if moves then
 						-- Look for climbable wall
 						local line, dist, x, y = nil, 40<<FRACBITS, 0, 0
-						for l in lines.iterate do -- SSSLLLOOOWWW look for a method to only get lines from the active sector
+
+						-- TODO: replace with iterating lines from a table instead
+						for l in lines.iterate do -- TODO: SSSLLLOOOWWW look for a method to only get lines from the active sector
 							if l.frontsector == l.backsector then continue end -- Just a decoration linedef, ignore...
 							if l.frontsector ~= mo.subsector.sector and l.backsector ~= mo.subsector.sector then continue end -- Line isn't in our sector!
 							local xtest, ytest = P_ClosestPointOnLine(mo.x, mo.y, l)
@@ -499,9 +501,9 @@ addHook("MobjThinker", function(mo)
 			end
 		elseif mo.state == S_PLAY_SPRING and springspin.value then
 			if mo.isfacingleft then
-				mo.angle = angle-ANG20*leveltime
+				player.drawangle = angle-ANG20*leveltime
 			else
-				mo.angle = angle+ANG20*leveltime
+				player.drawangle = angle+ANG20*leveltime
 			end
 		else
 			mo.glidediff = 0
@@ -512,12 +514,18 @@ addHook("MobjThinker", function(mo)
 					mo.isfacingleft = (angle-mo.angle) > 0
 				end
 			end
+
+			-- Handle player angle direction when rotating around an axis + flipped
 			if mo.isfacingleft then
+				player.drawangle = angle-ANGLE_90
 				mo.angle = angle-ANGLE_90
 			else
+				player.drawangle = angle+ANGLE_90
 				mo.angle = angle+ANGLE_90
 			end
+			-- Flipped axis
 			if mo.currentaxis.flipped then
+				player.drawangle = $1+ANGLE_180
 				mo.angle = $1+ANGLE_180
 			end
 		end
@@ -546,7 +554,7 @@ addHook("MobjThinker", function(mo)
 		-- Referencing player movement code and kinda recreating it here
 		if not player.climbing and not (player.pflags & PF_GLIDING)
 				and not player.exiting and not (player.pflags & PF_STASIS)
-				and not P_PlayerInPain(player) and player.health then
+				and not P_PlayerInPain(player) and player.mo.health then
 			local m = skins[mo.skin]
 			local topspeed = (2*m.normalspeed)/3
 			local thrustfactor = m.thrustfactor
@@ -587,6 +595,7 @@ addHook("MobjThinker", function(mo)
 			else
 				P_Thrust(mo, angle+ANGLE_90, movepushside)
 			end
+
 			local newmag = R_PointToDist2(0, 0, mo.momx, mo.momy)
 			if newmag > topspeed then
 				if oldmag > topspeed then
@@ -614,7 +623,7 @@ addHook("MobjThinker", function(mo)
 		player.jumpfactor = skins[mo.skin].jumpfactor
 		player.pflags = $1&~PF_FORCESTRAFE
 	end
-end, MT_PLAYER)
+end)
 
 -- Get linedef executors that trigger axis changers
 -- Table of sector numbers
