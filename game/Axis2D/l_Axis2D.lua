@@ -1,6 +1,18 @@
--- Axis2D, by chi.miru (Pac) and RedEnchilada
--- Public release version 1.2 (refactored somewhat on the afternoon of April 19, 2015)
--- Feel free to use it for your own purposes! In exchange, if you make a change that improves it, please share it with us!
+--[[
+
+* l_Axis2D.lua
+* (sprkizard varren, fickleheart)
+* (March 3, 2020 02:45)
+
+* Version: 1.2
+
+* Desc: Public release version 1.2 (refactored somewhat on the afternoon of April 19, 2015)
+		Feel free to use it for your own purposes! In exchange, if you make a change that
+		improves it, please share it with us!
+
+]]
+
+
 
 -- Killswitch to avoid the script loading multiple times
 if axis2d then
@@ -9,7 +21,8 @@ if axis2d then
 	return
 end
 
-rawset(_G, "axis2d", {legacymode = false}) -- Set legacymode on if you need rings and etc to check the LE method of axis switching (maybe you have an older A2D map that you don't wanna convert to the new system?)
+-- Set legacymode on if you need rings and etc to check the LE method of axis switching (maybe you have an older A2D map that you don't wanna convert to the new system?)
+rawset(_G, "axis2d", {legacymode = false}) 
 
 -- Toggle for spinning spring animation (for giggles)
 --local springspin = CV_RegisterVar({"springspin", 1, 0, CV_OnOff})
@@ -17,6 +30,11 @@ local springspin = CV_RegisterVar({"springspin", 0, 0, CV_OnOff})
 
 -- Axes found, so we don't have to look them up later
 local axes = {lastmap = 0}
+
+
+
+
+
 
 -- Refreshes the axis cache if needed
 function axis2d.CheckAxes()
@@ -62,14 +80,18 @@ addHook("MapLoad", axis2d.CheckAxes) -- Refresh axes on new map
 
 -- Function to get the vector of a given object's axis
 function axis2d.GetVector(mo)
+
 	if mo.currentaxis == nil then
 		return nil
 	end
+
 	if mo.currentaxis.angle ~= nil then
+
 		mo.currentaxis.x = mo.x+cos(mo.currentaxis.angle-ANGLE_90)
 		mo.currentaxis.y = mo.y+sin(mo.currentaxis.angle-ANGLE_90)
 		mo.currentaxis.radius = 1
 		mo.currentaxis.flipped = false
+
 		return mo.currentaxis.angle-ANGLE_90
 	else -- Circular axes
 		return R_PointToAngle2(mo.currentaxis.x, mo.currentaxis.y, mo.x, mo.y)
@@ -78,6 +100,7 @@ end
 
 -- Function to switch object to a particular axis, or eject them from the Axis2D system
 function axis2d.SwitchAxis(mo, axisnum)
+
 	axis2d.CheckAxes() -- For starters, make the axis table if it's not already done
 	
 	local player = mo.player -- Special handling for players
@@ -94,20 +117,25 @@ function axis2d.SwitchAxis(mo, axisnum)
 	-- on the Call Lua Function effect
 	-- can be used for settings, etc
 	if axisnum == 0 then
+
 		--print("Ejecting the player from the 2D track...")
 		if player and mo.currentaxis then
+
 			player.normalspeed = skins[mo.skin].normalspeed
 			player.thrustfactor = skins[mo.skin].thrustfactor
 			player.accelstart = skins[mo.skin].accelstart
 			player.acceleration = skins[mo.skin].acceleration
 			player.movevars = nil
+
 			if player.charability == CA_THOK then
 				player.actionspd = skins[mo.skin].actionspd
 			end
+
 			player.runspeed = skins[mo.skin].runspeed
 			player.jumpfactor = skins[mo.skin].jumpfactor
 			player.pflags = $1&~PF_FORCESTRAFE
 		end
+
 		mo.currentaxis = nil
 		return
 	end
@@ -124,23 +152,29 @@ function axis2d.SwitchAxis(mo, axisnum)
 	
 	-- Get extra properties from linedef
 	local linegrab = P_FindSpecialLineFromTag(9000, axisnum, -1)
-	if linegrab ~= -1 then
+
+	if (linegrab ~= -1) then
+
 		linegrab = lines[linegrab]
 
 		axis.camangle = R_PointToAngle2(0, 0, linegrab.dx, linegrab.dy)
-		if linegrab.flags & ML_NOCLIMB then
+
+		-- Set Angle lock
+		if (linegrab.flags & ML_NOCLIMB) then
 			axis.camangleabs = true
 		else
 			axis.camangleabs = false
 		end
-		if linegrab.flags & ML_EFFECT1 then
+
+		-- Set Camera distance
+		if (linegrab.flags & ML_EFFECT1) then
 			axis.camdist = R_PointToDist2(0, 0, linegrab.dx, linegrab.dy)
 		else
 			axis.camdist = false
 		end
 		
-		--cmiru: camheight?
-		if linegrab.flags & ML_EFFECT2 then
+		-- Set Camera height
+		if (linegrab.flags & ML_EFFECT2) then
 			axis.camheight = linegrab.frontsector.floorheight
 		else
 			axis.camheight = false
@@ -154,7 +188,9 @@ function axis2d.SwitchAxis(mo, axisnum)
 	--end
 	
 	if player and (oldangle ~= nil) then
+
 		local newangle = axis2d.GetVector(mo)
+
 		if mo.currentaxis and mo.currentaxis.flipped then
 			oldangle = $1+ANGLE_180
 		end
@@ -175,14 +211,16 @@ function axis2d.SwitchAxis(mo, axisnum)
 	end
 end
 
-
 addHook("LinedefExecute", function(l, mo)
 	axis2d.SwitchAxis(mo, l.tag)
 end, "P_DoAngleSpin")
 
+
 -- Snap mobj to axis
 function axis2d.SnapMobj(mo)
-	if not mo.currentaxis then return end -- Safety precaution!
+
+	-- Safety precaution!
+	if not mo.currentaxis then return end
 
 	local angle
 		
@@ -199,16 +237,22 @@ function axis2d.SnapMobj(mo)
 	
 	-- Snap player to position on axis
 	local snapx, snapy
+
 	angle = axis2d.GetVector(mo)
+
 	if mo.currentaxis.angle ~= nil then
+
 		local pangle = R_PointToAngle2(mo.currentaxis.basex, mo.currentaxis.basey, mo.x, mo.y)
 		pangle = $1-mo.currentaxis.angle
+
 		local pdist = R_PointToDist2(mo.currentaxis.basex, mo.currentaxis.basey, mo.x, mo.y)
 		pdist = FixedMul(cos(pangle), pdist)
+
 		snapx = mo.currentaxis.basex + FixedMul(pdist, cos(mo.currentaxis.angle))
 		snapy = mo.currentaxis.basey + FixedMul(pdist, sin(mo.currentaxis.angle))
 	else
 		local distfactor = R_PointToDist2(mo.currentaxis.x, mo.currentaxis.y, mo.x, mo.y)/mo.currentaxis.radius
+
 		snapx = mo.currentaxis.x + FixedDiv(mo.x - mo.currentaxis.x, distfactor)
 		snapy = mo.currentaxis.y + FixedDiv(mo.y - mo.currentaxis.y, distfactor)
 		-- Replace old cos/sin to prevent drifting
@@ -230,12 +274,15 @@ function axis2d.SnapMobj(mo)
 		--mo.momy = $1/-5
 		--print("HIT")
 	end
+
 	mo.oldpos = {
 		x = mo.x,
 		y = mo.y
 	}
-	
+
+
 	if mo.player then return end -- The player mobj handles this already!
+
 	-- Normalize momentum to angle
 	local vectordist = R_PointToDist2(0, 0, mo.momx, mo.momy)
 	local vectorang = R_PointToAngle2(0, 0, mo.momx, mo.momy)-angle
@@ -248,18 +295,22 @@ function axis2d.SnapMobj(mo)
 end
 
 local function SetCamera(player, x, y, z)
+
 	local mo = player.mo
+
 	if not (player.camera and player.camera.valid) then
 		player.camera = P_SpawnMobj(mo.x, mo.y, mo.z, MT_GFZFLOWER1)
 		player.camera.flags = MF_NOCLIP|MF_NOCLIPHEIGHT|MF_NOGRAVITY|MF_NOTHINK
 		player.camera.flags2 = MF2_DONTDRAW
 		P_TeleportMove(player.camera, x, y, z)
 	end
+
 	P_TeleportMove(player.camera, player.camera.x+(x-player.camera.x)/4, player.camera.y+(y-player.camera.y)/4, z)
 end
 
 -- Player management!
 addHook("MobjThinker", function(mo)
+
 	local player = mo.player
 	
 	if mo.flags2 & MF2_TWOD then
@@ -571,9 +622,11 @@ local axisChangeExecs = {}
 
 -- Function to reset
 function axis2d.ResetAxisChangeExecTable()
+
 	-- Get all of LD443 that change axes, and all of LD300
 	local ld443 = {}
 	local ld300 = {}
+
 	for line in lines.iterate do
 		if line.special == 300 then
 			table.insert(ld300, line)
@@ -603,17 +656,26 @@ end
 addHook("MapLoad", axis2d.ResetAxisChangeExecTable)
 
 local function IterateMobjSectors(mo, func)
+
 	local sec = mo.subsector.sector
+
 	func(mo, sec)
+
 	local tag = sec.tag
 	local foftypes = {223} -- Referenced from the SRB2DB 2.1 config
+
 	for i = 1, #foftypes do
+
 		local foftype = foftypes[i]
 		local linedefnum = P_FindSpecialLineFromTag(foftype, tag, -1)
 		local last = -1
+
 		while linedefnum ~= last do
+
 			local fof = lines[linedefnum]
+
 			if not fof then continue end
+			
 			fof = fof.frontsector
 			if mo.z <= fof.ceilingheight and mo.z+mo.height >= fof.floorheight then
 				func(mo, fof)
@@ -626,6 +688,7 @@ end
 
 -- Function to place an object along axes
 function axis2d.HandleSwitches(mo, legacy)
+
 	if legacy == nil then
 		legacy = axis2d.legacymode
 	end
@@ -647,6 +710,7 @@ function axis2d.HandleSwitches(mo, legacy)
 end
 
 function axis2d.ScanForAxes(mo) -- Look for axis switch "FOF"s (LD9001) to switch to, but only if already in Axis2D mode!
+
 	-- Tag is already taken by tagging it to the sector, so use X offset as axis number
 	local sec = mo.subsector.sector
 	
@@ -664,6 +728,7 @@ function axis2d.ScanForAxes(mo) -- Look for axis switch "FOF"s (LD9001) to switc
 end
 
 addHook("MobjThinker", function(mo)
+
 	-- Set lost rings to the player's axis on spawn
 	-- (Do this in MobjThinker instead of MobjSpawn because object mom hasn't initialized by the
 	-- time MobjSpawn hook is called!)
