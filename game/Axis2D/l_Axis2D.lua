@@ -99,7 +99,7 @@ function axis2d.GetVector(mo)
 end
 
 -- Function to switch object to a particular axis, or eject them from the Axis2D system
-function axis2d.SwitchAxis(mo, axisnum)
+function axis2d.SwitchAxis(mo, axisnum, legacyswitch)
 
 	axis2d.CheckAxes() -- For starters, make the axis table if it's not already done
 	
@@ -116,72 +116,62 @@ function axis2d.SwitchAxis(mo, axisnum)
 	-- This grabs another linedef from the tag
 	-- on the Call Lua Function effect
 	-- can be used for settings, etc
-	if axisnum == 0 then
+	if (legacyswitch) then
+		if axisnum == 0 then
 
-		--print("Ejecting the player from the 2D track...")
-		if player and mo.currentaxis then
-
-			player.normalspeed = skins[mo.skin].normalspeed
-			player.thrustfactor = skins[mo.skin].thrustfactor
-			player.accelstart = skins[mo.skin].accelstart
-			player.acceleration = skins[mo.skin].acceleration
-			player.movevars = nil
-
-			if player.charability == CA_THOK then
-				player.actionspd = skins[mo.skin].actionspd
+			--print("Ejecting the player from the 2D track...")
+			if player and mo.currentaxis then
+				axis2d.EjectPlayer(player)
 			end
 
-			player.runspeed = skins[mo.skin].runspeed
-			player.jumpfactor = skins[mo.skin].jumpfactor
-			player.pflags = $1&~PF_FORCESTRAFE
-		end
-
-		mo.currentaxis = nil
-		return
-	end
-	
-	if mo.currentaxis and mo.currentaxis.number == axisnum then
-		return -- We're already on this axis, so no need to reset everything
-	end
-	
-	local axis = axes[axisnum]
-	if not axis then
-		print("ERROR: Axis " .. axisnum .. " does not exist! Please create it!")
-		return
-	end
-	
-	-- Get extra properties from linedef
-	local linegrab = P_FindSpecialLineFromTag(9000, axisnum, -1)
-
-	if (linegrab ~= -1) then
-
-		linegrab = lines[linegrab]
-
-		axis.camangle = R_PointToAngle2(0, 0, linegrab.dx, linegrab.dy)
-
-		-- Set Angle lock
-		if (linegrab.flags & ML_NOCLIMB) then
-			axis.camangleabs = true
-		else
-			axis.camangleabs = false
-		end
-
-		-- Set Camera distance
-		if (linegrab.flags & ML_EFFECT1) then
-			axis.camdist = R_PointToDist2(0, 0, linegrab.dx, linegrab.dy)
-		else
-			axis.camdist = false
+			mo.currentaxis = nil
+			return
 		end
 		
-		-- Set Camera height
-		if (linegrab.flags & ML_EFFECT2) then
-			axis.camheight = linegrab.frontsector.floorheight
-		else
-			axis.camheight = false
+		if mo.currentaxis and mo.currentaxis.number == axisnum then
+			return -- We're already on this axis, so no need to reset everything
 		end
+
+
+		local axis = axes[axisnum]
+		if not axis then
+			print("ERROR: Axis " .. axisnum .. " does not exist! Please create it!")
+			return
+		end
+		
+		-- Get extra properties from linedef
+		local linegrab = P_FindSpecialLineFromTag(9000, axisnum, -1)
+
+		if (linegrab ~= -1) then
+
+			linegrab = lines[linegrab]
+
+			axis.camangle = R_PointToAngle2(0, 0, linegrab.dx, linegrab.dy)
+
+			-- Use absolute angle
+			if (linegrab.flags & ML_NOCLIMB) then
+				axis.camangleabs = true
+			else
+				axis.camangleabs = false
+			end
+
+			-- Set Camera distance
+			if (linegrab.flags & ML_EFFECT1) then
+				axis.camdist = R_PointToDist2(0, 0, linegrab.dx, linegrab.dy)
+			else
+				axis.camdist = false
+			end
+			
+			-- Set Camera height
+			if (linegrab.flags & ML_EFFECT2) then
+				axis.camheight = linegrab.frontsector.floorheight
+			else
+				axis.camheight = false
+			end
+		end
+		
+		mo.currentaxis = axis
 	end
-	
-	mo.currentaxis = axis
 	--print("Changing to axis " .. l.tag)
 	--if axis.angle then
 	--	print("Axis is a straight line.")
@@ -212,8 +202,74 @@ function axis2d.SwitchAxis(mo, axisnum)
 end
 
 addHook("LinedefExecute", function(l, mo)
-	axis2d.SwitchAxis(mo, l.tag)
+	axis2d.SwitchAxis(mo, l.tag, true)
 end, "P_DoAngleSpin")
+
+addHook("LinedefExecute", function(l, mo)
+	axis2d.SwitchAxis(mo, l.tag, true)
+end, "P_Axis2DOld")
+
+
+addHook("LinedefExecute", function(l, mo)
+
+	local axis = axes[l.tag]
+	local axisnum = l.tag
+	local player = mo.player
+
+
+	if axisnum == 0 then
+
+		--print("Ejecting the player from the 2D track...")
+		if player and mo.currentaxis then
+			axis2d.EjectPlayer(player)
+		end
+
+		mo.currentaxis = nil
+		return
+	end
+	
+	if mo.currentaxis and mo.currentaxis.number == axisnum then
+		return -- We're already on this axis, so no need to reset everything
+	end
+
+
+	if not axis then
+		print("ERROR: Axis " .. l.tag .. " does not exist! Please create it!")
+		return
+	end
+
+	-- Use E3 for x offset angle, otherwise default
+	if (l.flags & ML_EFFECT3) then
+		axis.camangle = FixedAngle(l.frontside.textureoffset)
+	else
+		axis.camangle = R_PointToAngle2(0, 0, l.dx, l.dy)
+	end
+
+	-- Use absolute angle
+	if (l.flags & ML_NOCLIMB) then
+		axis.camangleabs = true
+	else
+		axis.camangleabs = false
+	end
+
+	-- Set Camera distance
+	if (l.flags & ML_EFFECT1) then
+		axis.camdist = l.frontsector.floorheight
+	else
+		axis.camdist = false
+	end
+	
+	-- Set Camera height
+	if (l.flags & ML_EFFECT2 and l.backsector) then
+		axis.camheight = l.backsector.floorheight
+	else
+		axis.camheight = false
+	end
+
+
+	mo.currentaxis = axis
+	axis2d.SwitchAxis(mo, l.tag)
+end, "P_Axis2D")
 
 
 -- Snap mobj to axis
@@ -294,6 +350,29 @@ function axis2d.SnapMobj(mo)
 	P_InstaThrust(mo, angle+vectorang, vectordist)
 end
 
+
+-- Made to eject the player and reset any changes since these lines are used multiple times here
+function axis2d.EjectPlayer(player)
+
+	player.mo.currentaxis = nil
+
+	-- Reset status, and remove movevars
+	if not (player.mo.currentaxis) then
+		player.normalspeed = skins[player.mo.skin].normalspeed
+		player.thrustfactor = skins[player.mo.skin].thrustfactor
+		player.accelstart = skins[player.mo.skin].accelstart
+		player.acceleration = skins[player.mo.skin].acceleration
+		player.movevars = nil
+		if player.charability == CA_THOK then
+			player.actionspd = skins[player.mo.skin].actionspd
+		end
+		player.runspeed = skins[player.mo.skin].runspeed
+		player.jumpfactor = skins[player.mo.skin].jumpfactor
+		player.pflags = $1&~PF_FORCESTRAFE
+	end
+end
+
+
 local function SetCamera(player, x, y, z)
 
 	local mo = player.mo
@@ -305,7 +384,7 @@ local function SetCamera(player, x, y, z)
 		P_TeleportMove(player.camera, x, y, z)
 	end
 
-	P_TeleportMove(player.camera, player.camera.x+(x-player.camera.x)/4, player.camera.y+(y-player.camera.y)/4, z)
+	P_TeleportMove(player.camera, player.camera.x+(x-player.camera.x)/4, player.camera.y+(y-player.camera.y)/4, player.camera.z+(z-player.camera.z)/4)
 end
 
 -- Player management!
@@ -611,17 +690,7 @@ addHook("PlayerThink", function(player)
 		end
 		
 	elseif player.movevars then
-		player.normalspeed = skins[mo.skin].normalspeed
-		player.thrustfactor = skins[mo.skin].thrustfactor
-		player.accelstart = skins[mo.skin].accelstart
-		player.acceleration = skins[mo.skin].acceleration
-		player.movevars = nil
-		if player.charability == CA_THOK then
-			player.actionspd = skins[mo.skin].actionspd
-		end
-		player.runspeed = skins[mo.skin].runspeed
-		player.jumpfactor = skins[mo.skin].jumpfactor
-		player.pflags = $1&~PF_FORCESTRAFE
+		axis2d.EjectPlayer(player)
 	end
 end)
 
@@ -761,7 +830,7 @@ addHook("MobjThinker", function(mo)
 end, MT_FLINGRING)
 
 
--- Reset .movevars on mapchange (if no currentaxis)
+-- Fail-safe to eject and reset all players on map change (if no movevars or currentaxis)
 addHook("MapChange", function()
 
 	for player in players.iterate do
@@ -769,12 +838,6 @@ addHook("MapChange", function()
 		-- salt: extra safety
 		if not (player.mo and player.mo.valid) continue end
 		
-		
-		-- movevars being undefined means nobody moves on a map change when there
-		-- isn't even an axis to use at all..
-		if not player.mo.currentaxis then
-			player.movevars = 1;
-		end
-
+		axis2d.EjectPlayer(player)
 	end
 end)
