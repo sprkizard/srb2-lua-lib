@@ -470,6 +470,25 @@ addHook("PlayerThink", function(player)
 			if not mo.currentaxis.camheight then
 				mo.currentaxis.camheight = 0*FRACUNIT
 			end
+
+			-- Attempt to track if your distance from the camera and act if far above tolerance value (eg. teleporting)
+			if player.camera and player.camera.valid then
+
+				local axiscamdist = FixedHypot(mo.currentaxis.x-player.camera.x, mo.currentaxis.y-player.camera.y)
+				local playercamdist = FixedHypot(mo.currentaxis.x-mo.x, mo.currentaxis.y-mo.y)
+
+				--print("camera dist from axis: "..axiscamdist/FRACUNIT)
+				--print("p dist from axis: "..(playercamdist+ mo.currentaxis.camdist)/FRACUNIT)
+
+				if axiscamdist > (playercamdist+mo.currentaxis.camdist)+128*FRACUNIT then
+					P_TeleportMove(player.camera,
+						mo.currentaxis.x+(cos(angle)*mo.currentaxis.radius)+FixedMul(cos(camangle), mo.currentaxis.camdist),
+						mo.currentaxis.y+(sin(angle)*mo.currentaxis.radius)+FixedMul(sin(camangle), mo.currentaxis.camdist),
+						mo.z+20*FRACUNIT+(mo.currentaxis.camheight)
+					)
+				end
+			end
+
 			SetCamera(player, 
 				mo.currentaxis.x+(cos(angle)*mo.currentaxis.radius)+FixedMul(cos(camangle), mo.currentaxis.camdist),
 				mo.currentaxis.y+(sin(angle)*mo.currentaxis.radius)+FixedMul(sin(camangle), mo.currentaxis.camdist),
