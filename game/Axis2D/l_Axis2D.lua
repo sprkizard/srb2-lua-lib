@@ -265,6 +265,13 @@ addHook("LinedefExecute", function(l, mo)
 	else
 		axis.camheight = false
 	end
+	
+	-- Set Camera viewaiming
+	if (l.flags & ML_EFFECT4) then
+		axis.camaiming = FixedAngle(l.frontside.rowoffset)
+	else
+		axis.camaiming = 0
+	end
 
 
 	mo.currentaxis = axis
@@ -470,6 +477,9 @@ addHook("PlayerThink", function(player)
 			if not mo.currentaxis.camheight then
 				mo.currentaxis.camheight = 0*FRACUNIT
 			end
+			if not mo.currentaxis.camaiming then
+				mo.currentaxis.camaiming = 0
+			end
 
 			-- Attempt to track if your distance from the camera and act if far above tolerance value (eg. teleporting)
 			if player.camera and player.camera.valid then
@@ -499,6 +509,7 @@ addHook("PlayerThink", function(player)
 			player.awayviewtics = 2
 			player.awayviewmobj = player.camera
 			player.awayviewmobj.angle = R_PointToAngle2(player.awayviewmobj.x, player.awayviewmobj.y, mo.x, mo.y)
+			player.awayviewaiming = mo.currentaxis.camaiming -- Awayviewaiming property
 		end
 		player.awayviewmobj.momz = 0
 		
