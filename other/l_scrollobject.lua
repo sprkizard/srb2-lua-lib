@@ -2,7 +2,7 @@
 --local soft = {}
 
 local RUNNING_VALUES = {}
-
+local WAITING_REMOVAL = {}
 --local soft = {
 --    speed = 1,
 --    vars = {}
@@ -30,12 +30,16 @@ end
 --end
 
 --local function scrollvar(name, val, targetvalue, speed)
-local function scrollvar(name, parms)
+local function scrollvar(name, parms, single)
 
-    -- insert a new scroll object into the global table
+    --aliases
+    parms.val = parms.startv or parms.val
+    parms.targetvalue = parms.endv or parms.targetvalue
+    parms.speed = parms.spd or parms.speed
+
+    -- insert a new scrollobject into the global table
     if not (RUNNING_VALUES[name] and RUNNING_VALUES[name].active) then
-        RUNNING_VALUES[name] = {value = parms.val, target = parms.targetvalue, active = true, speed = parms.speed or 128, ref = parms.ref}
-        --table.insert(RUNNING_VALUES, {value = val, target = targetvalue, active = true, speed = speed or 1})
+        RUNNING_VALUES[name] = {active = true, value = parms.val, target = parms.targetvalue, speed = parms.speed or 128, once = single, dt = 0}
     end
     return RUNNING_VALUES[name].value
 end
@@ -53,18 +57,26 @@ addHook("MapChange", function()
 
     -- Wipe the table
     RUNNING_VALUES = {}
+    WAITING_REMOVAL = {}
 end)
 
+    --local remove = {}
 addHook("ThinkFrame", function()
+
+    -- Remove any in waiting
+    for i = 1, #WAITING_REMOVAL do
+      RUNNING_VALUES[WAITING_REMOVAL[i]] = nil
+    end
 
     -- Iterate the container and update and lerp all values
     for k,v in pairs(RUNNING_VALUES) do
 
-        -- Remove when finished
-        --if (v.value == v.target) then RUNNING_VALUES[v] = nil end--print("Remove this") end
-        v.value = FixedLerp(v.value, v.target, leveltime * v.speed)
+        v.dt = $1+1 * v.speed -- (Individual time value instead of leveltime)
+        v.value = FixedLerp(v.value, v.target, v.dt)
         --v.ref.scale = FixedLerp(v.value, v.target, leveltime * v.speed)
-        --if (v.value == v.target) then RUNNING_VALUES[k] = nil end--print("Remove this") end
+
+        -- Set removal when finished
+        if (v.value == v.target and v.once) then table.insert(WAITING_REMOVAL, k) print("Remove - "..k) end
         --print(k,v.value)
     end
 
@@ -101,11 +113,11 @@ local function LerpTest(v, stplyr, ticker, endtime)
     --end
 --
 --
-    local x = scrollvar("x_hud", {val = 20*FRACUNIT, targetvalue = 70*FRACUNIT, speed = 128})
+    local x = scrollvar("x_hud", {startv = 20*FRACUNIT, targetvalue = 70*FRACUNIT, speed = 128})
     v.drawString(x/FRACUNIT, 171, "Scroll String", V_ORANGEMAP)
     v.drawString(x/FRACUNIT, 181, "Above x position ["..x/FRACUNIT.."]", V_ORANGEMAP)
     
-    v.drawString(310, 190, "Tables ["..table.size(RUNNING_VALUES).."]", V_ORANGEMAP, "right")
+    v.drawString(310, 190, "RUNNING_VALUES ["..table.size(RUNNING_VALUES).."]", V_ORANGEMAP, "right")
 
 end
 
