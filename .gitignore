@@ -1,0 +1,5 @@
+*.bak
+*.exe
+*.dbs
+*.wad.*
+untracked/
