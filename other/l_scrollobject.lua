@@ -39,14 +39,24 @@ local function scrollvar(name, parms, single)
 
     -- insert a new scrollobject into the global table
     if not (RUNNING_VALUES[name] and RUNNING_VALUES[name].active) then
-        RUNNING_VALUES[name] = {active = true, value = parms.val, target = parms.targetvalue, speed = parms.speed or 128, once = single, dt = 0}
+        RUNNING_VALUES[name] = {active = true, value = parms.val or 0, target = parms.targetvalue or 0, speed = parms.speed or 128, func = parms.func, once = single, dt = 0}
     end
     return RUNNING_VALUES[name].value
 end
 
-rawset(_G, "clearScroll", function(name)
-    RUNNING_VALUES[name].active = false
+-- Reset an object from the global table by removing it immediately
+rawset(_G, "ResetSO", function(name)
+    RUNNING_VALUES[name] = nil
 end)
+
+-- Toss an object into the garbage so it no longer runs if not using once
+rawset(_G, "TossSO", function(name)
+    table.insert(WAITING_REMOVAL, RUNNING_VALUES[name])
+end)
+
+
+
+
 -- Reset table on change
 addHook("MapChange", function()
 
@@ -59,6 +69,8 @@ addHook("MapChange", function()
     RUNNING_VALUES = {}
     WAITING_REMOVAL = {}
 end)
+
+
 
     --local remove = {}
 addHook("ThinkFrame", function()
@@ -75,8 +87,13 @@ addHook("ThinkFrame", function()
         v.value = FixedLerp(v.value, v.target, v.dt)
         --v.ref.scale = FixedLerp(v.value, v.target, leveltime * v.speed)
 
+        -- Run a callback function when ended
+        if (v.value == v.target and v.func) then
+            v.func()
+        end
+
         -- Set removal when finished
-        if (v.value == v.target and v.once) then table.insert(WAITING_REMOVAL, k) print("Remove - "..k) end
+        if (v.value == v.target and v.once) then table.insert(WAITING_REMOVAL, k) end --print("Removing - "..k) end
         --print(k,v.value)
     end
 
@@ -113,9 +130,9 @@ local function LerpTest(v, stplyr, ticker, endtime)
     --end
 --
 --
-    local x = scrollvar("x_hud", {startv = 20*FRACUNIT, targetvalue = 70*FRACUNIT, speed = 128})
-    v.drawString(x/FRACUNIT, 171, "Scroll String", V_ORANGEMAP)
-    v.drawString(x/FRACUNIT, 181, "Above x position ["..x/FRACUNIT.."]", V_ORANGEMAP)
+    --local x = scrollvar("x_hud", {startv = 20*FRACUNIT, targetvalue = 70*FRACUNIT, speed = 128})
+    --v.drawString(x/FRACUNIT, 171, "Scroll String", V_ORANGEMAP)
+    --v.drawString(x/FRACUNIT, 181, "Above x position ["..x/FRACUNIT.."]", V_ORANGEMAP)
     
     v.drawString(310, 190, "RUNNING_VALUES ["..table.size(RUNNING_VALUES).."]", V_ORANGEMAP, "right")
 
