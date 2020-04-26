@@ -31,7 +31,7 @@ local function P_RandomChoice(choices)
     else
         return choices[RandomKey]
     end
-end)
+end
 
 -- x position cosine math for angle rotation around a point in space
 local function P_XAngle(distance, direction_angle, rotation)
