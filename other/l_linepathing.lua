@@ -212,7 +212,7 @@ addHook("MobjThinker", function(mo)
     end
 end, MT_LINEPATH)
 
-
+rawset(_G, "R_DrawMobjLine", R_DrawMobjLine)
 
 -- Unused Test Code
 --addHook("ThinkFrame", function()
