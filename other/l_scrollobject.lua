@@ -1,12 +1,6 @@
 
---local soft = {}
-
 local RUNNING_VALUES = {}
 local WAITING_REMOVAL = {}
---local soft = {
---    speed = 1,
---    vars = {}
---}
 
 function table.size(table_name)
     local n = 0
@@ -25,9 +19,6 @@ local function FixedLerp(a, b, t)
     end
 end
 
---function soft:to(val, targetval)
---    table.insert(RUNNING_VALUES, object)
---end
 
 --local function scrollvar(name, val, targetvalue, speed)
 local function scrollvar(name, parms, single)
@@ -100,6 +91,7 @@ addHook("ThinkFrame", function()
 end)
 
 rawset(_G, "scrollvar", scrollvar)
+rawset(_G, "smoothval", scrollvar)
 
 
 
