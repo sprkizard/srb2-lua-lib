@@ -24,6 +24,15 @@ local function FixedLerp(a, b, t)
     end
 end
 
+local function P_RandomChoice(choices)
+    local RandomKey = P_RandomRange(1, #choices)
+    if type(choices[RandomKey]) == "function" then
+        choices[RandomKey]()
+    else
+        return choices[RandomKey]
+    end
+end)
+
 -- x position cosine math for angle rotation around a point in space
 local function P_XAngle(distance, direction_angle, rotation)
     return distance*cos(direction_angle+FixedAngle(rotation*FRACUNIT))
@@ -40,6 +49,7 @@ end
 
 rawset(_G, "map", map)
 rawset(_G, "FixedLerp", FixedLerp)
+rawset(_G, "P_RandomChoice", P_RandomChoice)
 rawset(_G, "P_XAngle", P_XAngle)
 rawset(_G, "P_YAngle", P_YAngle)
 rawset(_G, "P_ZAngle", P_ZAngle)
