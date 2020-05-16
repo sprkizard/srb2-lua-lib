@@ -115,11 +115,11 @@ end
 local function R_DrawMobjLine(from, to, params)
 
     -- We want the line casting to be customizable, so we sort out this stuff in a table
-    local width = params.width or 64
+    local width = (params and params.width) or 64
     local dots = (params and params.dots == false) and MF2_DONTDRAW or 0
     local lines = (params and params.lines == false) and MF2_DONTDRAW or 0
-    local lineMobj = params.linemobj or MT_THOK
-    local scale = params.scale or FRACUNIT
+    local lineMobj = (params and params.linemobj) or MT_THOK
+    local scale = (params and params.scale) or FRACUNIT
     -- TODO: local func(), what if a function could run at the end of each spawn?
 
 
