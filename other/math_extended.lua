@@ -53,6 +53,15 @@ local function P_RandomChoice(choices)
     end
 end
 
+-- Lazy cos variable moving
+local function P_CosWave(speedangle, timer, numrange)
+    return cos(FixedAngle(speedangle*FRACUNIT)*timer)*numrange
+end
+
+local function P_SinWave(speedangle, timer, numrange)
+    return sin(FixedAngle(speedangle*FRACUNIT)*timer)*numrange
+end
+
 -- x position cosine math for angle rotation around a point in space
 local function P_XAngle(distance, direction_angle, rotation)
     return distance*cos(direction_angle+FixedAngle(rotation*FRACUNIT))
@@ -62,15 +71,17 @@ local function P_YAngle(distance, direction_angle, rotation)
     return distance*sin(direction_angle+FixedAngle(rotation*FRACUNIT))
 end
 -- z position cosine math for angle rotation around a point in space
-local function P_ZAngle(distance, direction_angle, rotation)
+local function P_ZAngle(distance, direction_angle, rotation, dist2, dir_angle2, rot2)
     return FixedMul(P_XAngle(distance, direction_angle, rotation),
-                    P_YAngle(distance, direction_angle, rotation))
+                    P_YAngle(dist2 or distance, dir_angle2 or direction_angle, rot2 or rotation))
 end
 
 rawset(_G, "map", map)
 rawset(_G, "FixedLerp", FixedLerp)
 rawset(_G, "floatToFixed", floatToFixed)
 rawset(_G, "P_RandomChoice", P_RandomChoice)
+rawset(_G, "P_CosWave", P_CosWave)
+rawset(_G, "P_SinWave", P_SinWave)
 rawset(_G, "P_XAngle", P_XAngle)
 rawset(_G, "P_YAngle", P_YAngle)
 rawset(_G, "P_ZAngle", P_ZAngle)
