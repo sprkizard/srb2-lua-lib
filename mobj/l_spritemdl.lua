@@ -1,5 +1,5 @@
 --[[
-* l_spritegroup3d.lua
+* l_spritemdl.lua
 * (sprkizard)
 * (May 16, 2020 00:28)
 * Desc: Small script that allows the simple creation of
@@ -15,27 +15,27 @@
 
 
 -- Builds up a mobj sprite group from a list of mobjs
-local function P_BuildSpriteGroup(source, grouplist)
+local function P_BuildSpriteMdl(source, grouplist)
 
 	-- source mobj is not valid
 	if not source.valid then return end
 
-	source.sprgroup = grouplist
+	source.sprmdl = grouplist
 end
 
 -- Updates the position and callback functions of the sprite group
-local function P_UpdateSpriteGroup(source, func)
+local function P_UpdateSpriteMdl(source, func)
 
 	-- source mobj is not valid
 	if not source.valid then return end
 
 	-- Run through the entire source spritegroup
-	for i=1,#source.sprgroup do
+	for i=1,#source.sprmdl do
 
-		local groupmobj = source.sprgroup[i].mobj
-		local offset = source.sprgroup[i].offset or {x = 0, y = 0, z = 0} -- TODO: be able to exclude each axis; default to 0
-		local direction = source.sprgroup[i].angle or 0
-		local rotation = source.sprgroup[i].rotation or 0
+		local groupmobj = source.sprmdl[i].mobj
+		local offset = source.sprmdl[i].offset or {x = 0, y = 0, z = 0} -- TODO: be able to exclude each axis; default to 0
+		local direction = source.sprmdl[i].angle or 0
+		local rotation = source.sprmdl[i].rotation or 0
 
 		-- Follow the source angle + independent angle
 		groupmobj.angle = source.angle+FixedAngle(direction*FRACUNIT)
@@ -46,7 +46,7 @@ local function P_UpdateSpriteGroup(source, func)
 		-- Run a callback function to edit one or all items
 		if (func) then
 			do
-				func(source.sprgroup[i])
+				func(source.sprmdl[i])
 			end
 		end
 
@@ -61,5 +61,5 @@ local function P_UpdateSpriteGroup(source, func)
 end
 
 -- Expose globals
-rawset(_G, "P_BuildSpriteGroup", P_BuildSpriteGroup)
-rawset(_G, "P_UpdateSpriteGroup", P_UpdateSpriteGroup)
+rawset(_G, "P_BuildSpriteMdl", P_BuildSpriteMdl)
+rawset(_G, "P_UpdateSpriteMdl", P_UpdateSpriteMdl)
