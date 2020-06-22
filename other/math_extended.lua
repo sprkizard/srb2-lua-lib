@@ -24,6 +24,26 @@ local function FixedLerp(a, b, t)
     end
 end
 
+-- A function created by SwitchKaze in #scripting
+local function floatToFixed(str)
+    if not (str and str:len()) then return 0 end
+    local decpos = str:find('%.')        -- decposito
+    if decpos == nil then
+        return tonumber(str)*FRACUNIT
+    end
+    local num = tonumber(str:sub(0,decpos-1))*FRACUNIT
+    local frac = 0
+    local i = 1
+    for c in str:sub(decpos+1,str:len()):gmatch("%d+") do
+        frac = frac + tonumber(c)*FRACUNIT/(10^i)
+        i = i+1
+        -- no digit n*65536 will ever be > 10^7
+        if i==7 then break end
+    end
+    
+    return num+frac
+end
+
 local function P_RandomChoice(choices)
     local RandomKey = P_RandomRange(1, #choices)
     if type(choices[RandomKey]) == "function" then
@@ -49,6 +69,7 @@ end
 
 rawset(_G, "map", map)
 rawset(_G, "FixedLerp", FixedLerp)
+rawset(_G, "floatToFixed", floatToFixed)
 rawset(_G, "P_RandomChoice", P_RandomChoice)
 rawset(_G, "P_XAngle", P_XAngle)
 rawset(_G, "P_YAngle", P_YAngle)
