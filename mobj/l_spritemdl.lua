@@ -31,6 +31,9 @@ local function P_UpdateSpriteMdl(source, func)
 
 	-- Run through the entire source spritegroup
 	for i=1,#source.sprmdl do
+		
+		-- sprmdl mobj is not valid
+		if not source.sprmdl[i].mobj.valid then return end
 
 		local groupmobj = source.sprmdl[i].mobj
 		local offset = source.sprmdl[i].offset or {x = 0, y = 0, z = 0} -- TODO: be able to exclude each axis; default to 0
