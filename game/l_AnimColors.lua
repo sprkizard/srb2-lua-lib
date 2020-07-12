@@ -11,9 +11,9 @@
 
 
 
-local function M_BuildRampAnim(an_skcolors, newRamp)
+local function M_ConvertRampAnim(an_skcolors)
 
-	an_skcolors.colors = {}
+	local outputRamp = {}
 
 	-- Iterate through skcolors
 	--print("Anim Size: " .. #an_skcolors)
@@ -31,7 +31,7 @@ local function M_BuildRampAnim(an_skcolors, newRamp)
 			-- Vanilla colors are indexed diffrently by 1 (?)
 			if (type(skc_ramp) == "userdata") then e = $1-1 else end
 			--print("Entry ("..tostring(e)..") - "..tostring(skc_ramp[e]))
-			table.insert(an_skcolors.colors, skc_ramp[e])
+			table.insert(outputRamp, skc_ramp[e])
 		end
 
 		-- Now go reversed!
@@ -40,36 +40,17 @@ local function M_BuildRampAnim(an_skcolors, newRamp)
 				-- Vanilla colors are indexed diffrently by 1 (?)
 			if (type(skc_ramp) == "userdata") then e = $1-1 else end
 				--print("Entry ("..tostring(e)..") - "..tostring(skc_ramp[e]))
-				table.insert(an_skcolors.colors, skc_ramp[e])
+				table.insert(outputRamp, skc_ramp[e])
 			end
 		end
 	end
-	-- Remove leftovers except for the actual color ramp
-	for i=1,#an_skcolors do
-		table.remove(an_skcolors, i)
-	end
+	-- Wipes the original table and converts it to a usable ramp
+	-- (if all else fails, revert to newOutputRamp)
+	an_skcolors = {}
+	return outputRamp
 end
 
---M_BuildRampAnim(anim_dreamy, animatedrampfull, false)
 
--- -- iterate  skincolors
--- for i=1,#skincolors-1 do
-
--- 	-- ramp table
--- 	local skincolor_ramp = skincolors[i].ramp
-
--- 	print ("Ramp numbers " .. #skincolor_ramp)
--- 	-- go over ramp colors
--- 	for j=0,#skincolor_ramp-1 do
--- 		print(skincolors[i].name .. "|" .. skincolor_ramp[j])
--- 		table.insert(all, skincolor_ramp[j])
--- 	end
--- 	--now go reverse!
--- 	for j=#skincolor_ramp-1, 0, -1 do
--- 		print(skincolors[i].name .. "|" .. skincolor_ramp[j])
--- 		table.insert(all, skincolor_ramp[j])
--- 	end
--- end
 
 -- Rotates a table by inserting the last entry to the start and removing it afterwards
 local function rotatetable(tbl, step)
@@ -80,21 +61,11 @@ local function rotatetable(tbl, step)
 end
 
 
-addHook("ThinkFrame", function()
 
-	--local colRamp = skincolors[SKINCOLOR_RADIANTPURPLE].ramp
-	-- for i = 0, 15 do
-		-- colRamp[i] = ($1+1) % 256
-		--colRamp[i] = skincolors[count+i].ramp
-	-- end
-	-- wrap(ramp,1)
-	-- skincolors[SKINCOLOR_RADIANTPURPLE].ramp = ramp
-	-- count = (($1 + 1 ) % 56)
-	-- skincolors[SKINCOLOR_RADIANTPURPLE].ramp = skincolors[count+i].ramp
+local function M_AnimColorThink(skinColor, animRamp, step)
+	rotatetable(animRamp, step)
+	skincolors[skinColor].ramp = animRamp
+end
 
-
-	--wrap(anim_dreamy.colors, 1)
-	wrap(anim_supergolden.colors, 1)
-	--skincolors[SKINCOLOR_DREAMY].ramp = anim_dreamy.colors
-	skincolors[SKINCOLOR_SUPERGOLDEN].ramp = anim_supergolden.colors
-end)
+rawset(_G, "M_BuildRampAnim", M_BuildRampAnim)
+rawset(_G, "M_AnimColorThink", M_AnimColorThink)
