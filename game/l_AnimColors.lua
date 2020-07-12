@@ -67,5 +67,5 @@ local function M_AnimColorThink(skinColor, animRamp, step)
 	skincolors[skinColor].ramp = animRamp
 end
 
-rawset(_G, "M_BuildRampAnim", M_BuildRampAnim)
+rawset(_G, "M_ConvertRampAnim", M_ConvertRampAnim)
 rawset(_G, "M_AnimColorThink", M_AnimColorThink)
