@@ -62,6 +62,11 @@ local function P_SinWave(speedangle, timer, numrange)
     return sin(FixedAngle(speedangle*FRACUNIT)*timer)*numrange
 end
 
+-- Triangular Wave
+local function tri(m, tm, period)
+	return abs((tm % (period or (m*2)) ) - m)
+end
+
 -- x position cosine math for angle rotation around a point in space
 local function P_XAngle(distance, direction_angle, rotation)
     return distance*cos(direction_angle+FixedAngle(rotation*FRACUNIT))
@@ -82,6 +87,7 @@ rawset(_G, "floatToFixed", floatToFixed)
 rawset(_G, "P_RandomChoice", P_RandomChoice)
 rawset(_G, "P_CosWave", P_CosWave)
 rawset(_G, "P_SinWave", P_SinWave)
+rawset(_G, "tri", tri)
 rawset(_G, "P_XAngle", P_XAngle)
 rawset(_G, "P_YAngle", P_YAngle)
 rawset(_G, "P_ZAngle", P_ZAngle)
