@@ -21,6 +21,14 @@ local function P_BuildSpriteMdl(source, grouplist)
 	if not source.valid then return end
 
 	source.sprmdl = grouplist
+	for i=1,#source.sprmdl do
+
+		-- References the parent in every object created by the parent builder, including the object itself
+		if (source.sprmdl[i].mobj.valid) then
+			source.sprmdl[i].mobj.sprmdl_parent = source
+			source.sprmdl[i].mobj.sprmdl_self = source.sprmdl[i]
+		end
+	end
 end
 
 -- Updates the position and callback functions of the sprite group
@@ -31,7 +39,7 @@ local function P_UpdateSpriteMdl(source, func)
 
 	-- Run through the entire source spritegroup
 	for i=1,#source.sprmdl do
-		
+
 		-- sprmdl mobj is not valid
 		if not source.sprmdl[i].mobj.valid then return end
 
@@ -58,7 +66,7 @@ local function P_UpdateSpriteMdl(source, func)
 			groupmobj,
 			source.x+FixedMul(offset.x*cos(source.angle+FixedAngle(rotation*FRACUNIT)), groupmobj.scale),
 			source.y+FixedMul(offset.y*sin(source.angle+FixedAngle(rotation*FRACUNIT)), groupmobj.scale),
-			source.z+offset.z*FRACUNIT)
+			source.z+FixedMul(offset.z*FRACUNIT, groupmobj.scale))
 	end
 
 end
