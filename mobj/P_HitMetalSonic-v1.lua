@@ -63,7 +63,7 @@ local function P_HitMetalSonic(thing)
 						
 	if
 	(
-		metal.state == S_METALSONIC_FLOAT	-- Only Metal Sonic uses this state (as far as I know)
+		thing.state == S_METALSONIC_FLOAT	-- Only Metal Sonic uses this state (as far as I know)
 											-- and this is the only state in which special code is necessary.
 	)
 							
@@ -89,4 +89,4 @@ local function P_HitMetalSonic(thing)
 	end
 						
 									
-end)
+end
