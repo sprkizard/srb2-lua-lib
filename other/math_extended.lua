@@ -24,6 +24,20 @@ local function FixedLerp(a, b, t)
     end
 end
 
+-- A fixed lerp function that creates its own time TODO: review???
+local function DeltaFixedLerp(start, dest, speed)
+    local deltscaletime = nil
+
+    if deltscaletime == nil then
+        deltscaletime = 0
+    end
+
+    --if (leveltime > 15) then deltscaletime = $1+1 * speed end
+    deltscaletime = $1+1 * speed
+
+    return FixedLerp(start, dest, deltscaletime)
+end
+
 -- A function created by SwitchKaze in #scripting
 local function floatToFixed(str)
     if not (str and str:len()) then return 0 end
@@ -83,6 +97,7 @@ end
 
 rawset(_G, "map", map)
 rawset(_G, "FixedLerp", FixedLerp)
+rawset(_G, "DeltaFixedLerp", FixedLerp)
 rawset(_G, "floatToFixed", floatToFixed)
 rawset(_G, "P_RandomChoice", P_RandomChoice)
 rawset(_G, "P_CosWave", P_CosWave)
