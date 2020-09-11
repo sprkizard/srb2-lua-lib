@@ -50,14 +50,11 @@ end
 
 
 
-
-
 -- The container table that holds all user created HUD elements
 rawset(_G, "hudLayer", {})
 
-
-
 -- Some examples
+--[[
 hudLayer["test1"] = {
 	layernum = 5,
 	func = (function(v, stplyr, cam)
@@ -84,7 +81,9 @@ hudLayer["removable"] = {
 	func = (function(v, stplyr, cam) 
 		v.drawString(129, 67, "Remove me on Jump", V_ALLOWLOWERCASE, "left")
 	end)
-}		
+}
+--]]
+
 
 
 -- Iterates and sorts through hudLayer with spairs
@@ -93,17 +92,59 @@ local function sortHudItems(v, stplyr, cam)
 	--for k,huditem in spairs(hudLayer, function(t,a,b) return t[b].layernum < t[a].layernum end) do -- desc
 	for _,huditem in spairs(hudLayer, function(t,a,b) return t[a].layernum > t[b].layernum end) do -- asc
 		
-		-- Do not run on indexes with -1 at all.
-		if (huditem.layernum == -1) then return end
-		
-		-- Run hud functions
-		huditem.func(v, stplyr, cam)
+		-- Delete the item
+		if (huditem.layernum == -99) then
+			huditem = nil
+			return
+		end
+
+		(function()
+			-- Do not run on indexes with -1 at all.
+			if (huditem.layernum == -1) then return end
+			
+			-- Run hud functions
+			huditem.func(v, stplyr, cam)
+		end)()
 	end
 end
 hud.add(sortHudItems, "game")
 
+-- Adds a new layer
+local function R_AddHud(layername, ordernum, hudfunc)
+	hudLayer[layername] = {
+		layernum = ordernum,
+		func = (function(v, stplyr, cam) hudfunc(v, stplyr, cam) end)
+	}
+end
 
+-- Sets layer order
+local function R_SetHudOrder(layername, ordernum)
+	if not (hudLayer and hudLayer[layername]) then return end
+	hudLayer[layername].layernum = ordernum
+end
+
+-- Disables a layer
+local function R_DisableHud(layername)
+	if not (hudLayer and hudLayer[layername]) then return end
+	hudLayer[layername].layernum = -1
+end
+
+-- Sets the layer to be deleted
+local function R_DeleteHud(layername)
+	if not (hudLayer and hudLayer[layername]) then return end
+	hudLayer[layername].layernum = -99
+end
+
+
+rawset(_G, "R_AddHud", R_AddHud)
+rawset(_G, "R_SetHudOrder", R_SetHudOrder)
+rawset(_G, "R_DisableHud", R_DisableHud)
+rawset(_G, "R_DeleteHud", R_DeleteHud)
+
+
+-- (Uncomment to test)
 -- Test the addon by removing removable layer, and replacing the text on 'test1'
+--[[
 addHook("ThinkFrame", function()
 
 	for player in players.iterate do
@@ -116,3 +157,4 @@ addHook("ThinkFrame", function()
 		end
 	end
 end)
+--]]
