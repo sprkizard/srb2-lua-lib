@@ -11,9 +11,7 @@ local function fadescreen(direction, color, speed, timescale, dontdraw)
     if (direction == "in") then dt = 32 end
 
     -- Send new overwritable hudlayer entry
-    hudLayer["fadescreen"] = {
-    layernum = visible_layer,
-    func = (function(v, stplyr, cam)
+    R_AddHud("fadescreen", visible_layer, function(v, stplyr, cam)
         -- simple time math for out and in fading
         -- through min and max values of 0 and 32
         if (leveltime % dts == 0) then
@@ -28,7 +26,6 @@ local function fadescreen(direction, color, speed, timescale, dontdraw)
         -- Only one fadescreen needed outside the if here
         v.fadeScreen(color, dt%33)
     end)
-    }
 
 end
 
