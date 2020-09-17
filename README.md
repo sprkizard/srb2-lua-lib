@@ -24,6 +24,4 @@ _For contribution, please use comments in your script where you can (help people
 ]]
 ```
 
-
-
-
+*Remember to also include proper attribution where needed!*
