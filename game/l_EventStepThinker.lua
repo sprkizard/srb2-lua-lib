@@ -1,3 +1,16 @@
+--[[
+* l_EventStepThinker.lua
+* (sprkizard)
+* (September ‎18, ‎2020, 3:39)
+* Desc: A set of functions to run map events in the same vein of
+	Pokémon Mystery Dungeon: Gates to Infinity.
+	(Inspired by a script made by fickleheart and D00D64)
+
+* Usage: TODO: check wiki???
+
+* Depends on:
+
+]]
 
 rawset(_G, "Event", {})
 
