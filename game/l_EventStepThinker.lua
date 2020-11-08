@@ -30,9 +30,15 @@ function Event.new(eventname, ...)
 
 	_event.name = eventname
 	_event.status = "normal" -- mimic coroutine statuses (dead|suspended|running|normal)
-	--_event.signal = nil -- signal to wait on if given one
 	_event.step = 1 -- the current step in the event (might be easier than for-do?)
-	_event.index = {_self = _event, _user = nil, _idletime = 0} -- where all of our class variables can be traded
+	 -- where all of our class variables can be traded inside the event
+	_event.index = {
+		_self = _event, -- a reference to the event itself
+		_user = nil, -- the user of the event (eg. player, mobj, variable)
+		_idletime = 0, -- the event wait timer
+		_looptrack = 0, -- the event looptracker (can be used for anything eg. doOnce)
+		-- _signal = nil -- signal to wait on if given one
+	}
 	
 	-- Reference our event list into the event class
 	-- All event functions will reference the index for using variables
@@ -64,15 +70,18 @@ function Event.start(eventname, args)
 	assert(EventList[eventname], "Event '" .. eventname .. "' does not exist!")
 
 	local ev = EventList[eventname]
+
 	-- TODO: this needs to be deepcopied to have all fields be copied here and matched correctly
 	--[[local ev = {}
 	for k,v in pairs(EventList[eventname]) do
 		ev[k] = v
 	end--]]
+
 	ev.status = "running" -- Set the status to running
 	ev.step = args and args.order or 1 -- Advance to a future step on start? (use with caution)
 	ev.index._user = args and args.user or nil -- set the user of the event
 	ev.index._idletime = 0 -- TODO: timer problem on reload during wait????
+	ev.index._looptrack = 0 -- TODO: above
 
 	-- Clone the table to prevent editing the direct reference
 	table.insert(Running_Events, ev)
@@ -99,6 +108,7 @@ function Event.destroy(eventname)
 	end
 end
 
+-- Forces an event to wait until a set time
 local function wait(event, time)
 
 	-- sleep time is over
@@ -117,8 +127,8 @@ local function wait(event, time)
 	end
 end
 
+-- Waits until the condition is true, then unsuspend the event
 local function waitUntil(event, cond)
-	-- Wait until the condition is 
 	if not (cond) then
 		event._self.status = "suspended"
 	else
@@ -138,6 +148,52 @@ local function signal(event, signalname)
 	-- Activates a signal
 	Running_Events[event].signal = signalname
 end--]]
+
+-- Does a function once on an event during a wait()
+-- (for multiple, use doOrder instead)
+rawset(_G, "doOnce", function(event, func)
+	-- Run once when looptracker is under 1 (thanks for this)
+	if event._looptrack < 1 then
+		
+		func()
+
+		if (Event.printlog) then
+			print("doOnce has been launched.")
+		end
+	end
+	event._looptrack = $1+1
+end)
+
+-- Waits until the condition is true, then unsuspend the event (wrapper ver.)
+rawset(_G, "doUntil", function(event, cond, while_func)
+	if not (cond) then
+		while_func()
+		event._self.status = "suspended"
+	else
+		event._self.status = "resumed"
+
+		if (Event.printlog) then
+			print("doUntil has ended.")
+		end
+	end
+end)
+
+-- Starts a list of functions per gameframe, and suspends itself on the last
+rawset(_G, "doOrder", function(event, funclist)
+
+	-- Increase loop tracker until the end of the list
+	if (event._looptrack < #funclist) then
+		event._looptrack = $1+1	
+		event._self.status = "suspended"
+	end
+
+	-- Run the function type in the list
+	if type(funclist[event._looptrack]) == "function" then
+		do funclist[event._looptrack]() end
+	end
+
+end)
+
 
 -- Handles running events similar to coroutines
 local function RunEvents(event)
@@ -162,7 +218,7 @@ local function RunEvents(event)
 
 				-- Print some useful info to the log when enabled
 				if (Event.printlog) then
-					print(string.format("%d/%d %s[%s] - [w%d] [Action]:", evclass.step, #evclass.events, evclass.name, evclass.status, evclass.index._idletime))
+					print(string.format("%d/%d %s[%s] - [w%d] [lt%d] [Action]:", evclass.step, #evclass.events, evclass.name, evclass.status, evclass.index._idletime, evclass.index._looptrack))
 				end
 
 				do evclass.events[evclass.step]() end -- Run functions (:
@@ -172,6 +228,7 @@ local function RunEvents(event)
 
 				-- Progress the step of the list
 				evclass.step = $1+1
+				evclass.index._looptrack = 0
 				-- end
 			end
 		end)()
@@ -224,8 +281,35 @@ end
 --]]
 
 -- Hooks
+
+-- TODO: when netvars eventually works
+addHook("NetVars", function(net)
+	Running_Events = net(Running_Events)
+	EventList = net(EventList)
+end)
+
+-- When specified, run an event by name on map load, and do other kinds of stuff
+addHook("MapLoad", function(gamemap)
+	
+	-- Run an event on map load
+	if (mapheaderinfo[gamemap].loadevent) then
+		for player in players.iterate do
+			-- Event.newsub(mapheaderinfo[gamemap].loadevent:gsub("%z", ""), player)
+		end
+	end
+	-- Run a global event
+	-- TODO: stated far above, but thinking about it further- if globals are
+	-- just started every time with the same exact content, does it matter
+	-- if we don't deepcopy?
+ 	if (mapheaderinfo[gamemap].globalevent) then
+		Event.start(mapheaderinfo[gamemap].globalevent:gsub("%z", ""), {user = server})
+	end
+end)
+
 -- Destroy all members on map change (TODO: unless specified?)
 addHook("MapChange", function()
+
+	-- TODO: move to separate function (?)
 	for key,evclass in pairs(Running_Events) do
 		Running_Events[key] = nil
 		-- evclass.status = "dead"
