@@ -127,12 +127,17 @@ local function wait(event, time)
 	end
 end
 
--- Waits until the condition is true, then unsuspend the event
-local function waitUntil(event, cond)
+-- Waits until the condition is true, then unsuspend the event (with callback at end)
+local function waitUntil(event, cond, end_func)
 	if not (cond) then
 		event._self.status = "suspended"
 	else
 		event._self.status = "resumed"
+
+		-- Run a callback function when the condition is reached if specified
+		if (end_func) then
+			end_func()
+		end
 	end
 end
 
@@ -171,7 +176,7 @@ rawset(_G, "doUntil", function(event, cond, while_func, end_func)
 		event._self.status = "suspended"
 	else
 		event._self.status = "resumed"
-
+		
 		-- Run a callback function when the condition is reached if specified
 		if (end_func) then
 			end_func()
