@@ -165,13 +165,18 @@ rawset(_G, "doOnce", function(event, func)
 end)
 
 -- Waits until the condition is true, then unsuspend the event (wrapper ver.)
-rawset(_G, "doUntil", function(event, cond, while_func)
+rawset(_G, "doUntil", function(event, cond, while_func, end_func)
 	if not (cond) then
 		while_func()
 		event._self.status = "suspended"
 	else
 		event._self.status = "resumed"
 
+		-- Run a callback function when the condition is reached if specified
+		if (end_func) then
+			end_func()
+		end
+		
 		if (Event.printlog) then
 			print("doUntil has ended.")
 		end
