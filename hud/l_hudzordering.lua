@@ -135,11 +135,22 @@ local function R_DeleteHud(layername)
 	hudLayer[layername].layernum = -99
 end
 
+-- Sets internal game huds to be hidden/unhidden
+local function R_SetInternalHudStatus(namelist, huditemvisible)
+	for i=1,#namelist do
+		if (huditemvisible) then
+			hud.enable(namelist[i])
+		else
+			hud.disable(namelist[i])
+		end
+	end
+end
 
 rawset(_G, "R_AddHud", R_AddHud)
 rawset(_G, "R_SetHudOrder", R_SetHudOrder)
 rawset(_G, "R_DisableHud", R_DisableHud)
 rawset(_G, "R_DeleteHud", R_DeleteHud)
+rawset(_G, "R_SetInternalHudStatus", R_SetInternalHudStatus)
 
 
 -- (Uncomment to test)
