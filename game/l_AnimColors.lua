@@ -11,61 +11,129 @@
 
 
 
-local function M_ConvertRampAnim(an_skcolors)
 
-	local outputRamp = {}
+freeslot("SKINCOLOR_BLACKWAVE") 
+skincolors[SKINCOLOR_BLACKWAVE] = {
+	name = "Animated",
+	-- ramp = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	ramp = {0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30},
+	chatcolor = V_GRAYMAP,
+	accessible = true
+}
+M_MoveColorAfter(SKINCOLOR_BLACKWAVE, SKINCOLOR_BLUE)
 
-	-- Iterate through skcolors
-	--print("Anim Size: " .. #an_skcolors)
-	for i=1,#an_skcolors do
+rawset(_G, "AnimColors", {})
 
-		---- Color ramp table of this specific skincolor
-		local sk_color = an_skcolors[i] -- skincolor
-		local skc_name = an_skcolors[i].name or "none" -- skincolor name
-		local skc_ramp = an_skcolors[i].ramp -- skincolor ramp
+AnimColors.chromeloop = {
+	startpos = 1,
+	type = "test",
+	ramp = {
+		0,0,0,0,0,0,0,0,0,0,
+		31,31,31,31,31,31,31,31,31,31
+	},
+}
 
-		--print("Ramp Size of ["..skc_name.."]: " .. #skc_ramp)
+--[[local blackwavepos = 1
 
-		-- Iterate through ramp entries
-		for e=1, #skc_ramp do
-			-- Vanilla colors are indexed diffrently by 1 (?)
-			if (type(skc_ramp) == "userdata") then e = $1-1 else end
-			--print("Entry ("..tostring(e)..") - "..tostring(skc_ramp[e]))
-			table.insert(outputRamp, skc_ramp[e])
+32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,
+		46,45,44,43,42,41,40,39,38,37,36,35,34,33
+
+local anim_blackwave = {
+	{0,0,0,0,0,0,0,0,0,0},
+	{31,31,31,31,31,31,31,1,1,1}
+}
+
+local blackramp = {
+	0,0,0,0,0,0,0,0,0,0,
+	31,31,31,31,31,31,31,31,31,31
+}
+
+local abm = {2,4,6,8,10,12,14,16,18,20,22,24,26,28,30}--]]
+-- local abm = {10,20,30,40,50,60,70,80,90,100,110,120,130,140,150}
+
+-- local ColorRamps = {}
+-- ColorRamps.blackwave = {
+-- 	ramp = {}
+-- }
+local rtime = 0
+
+local function P_AnimateSkinColor(skincolornum, animdef)
+
+	local max = #skincolors[skincolornum].ramp
+	local skinramp = skincolors[skincolornum].ramp
+
+	-- local animpos = animdef.startpos
+
+	if (animdef.type == "test") then
+
+		animdef.startpos = $ < #animdef.ramp and $1+1 or 1
+
+		for i=0,15 do
+			skincolors[skincolornum].ramp[i] = animdef.ramp[((animdef.startpos+i) % #animdef.ramp)+1]
 		end
-
-		-- Now go reversed!
-		if (sk_color.reverse and sk_color.reverse == true) then
-			for e=#skc_ramp, 1, -1 do
-				-- Vanilla colors are indexed diffrently by 1 (?)
-			if (type(skc_ramp) == "userdata") then e = $1-1 else end
-				--print("Entry ("..tostring(e)..") - "..tostring(skc_ramp[e]))
-				table.insert(outputRamp, skc_ramp[e])
-			end
+	elseif (animdef.type == "idk")
+	--[[elseif (antype == "flatscroll") then
+		skincolors[skincolornum].ramp[(leveltime % max)] = ramp[(leveltime/max % #ramp)+1]
+	elseif(antype == "flatflash") then
+		for i=0,max do
+			skincolors[skincolornum].ramp[i] = ramp[leveltime % #ramp]
 		end
+	elseif (antype == "flatbounce") then
+		for i=0,max-1 do
+			local b = abs(cos(ANG1*leveltime)*#ramp)/FRACUNIT
+			skincolors[skincolornum].ramp[i] = ramp[b]
+		end--]]
 	end
-	-- Wipes the original table and converts it to a usable ramp
-	-- (if all else fails, revert to newOutputRamp)
-	an_skcolors = {}
-	return outputRamp
 end
 
+addHook("ThinkFrame", function()
+	local _ramp = skincolors[SKINCOLOR_BLACKWAVE].ramp
+	-- print(_ramp[1])
+
+	--[[for i=0,#skincolors[SKINCOLOR_BLACKWAVE].ramp-1 do
+		print(skincolors[SKINCOLOR_BLACKWAVE].ramp[i])
+	end--]]
+	print(string.format("{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d}", 
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[0],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[1],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[2],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[3],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[4],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[5],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[6],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[7],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[8],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[9],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[10],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[11],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[12],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[13],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[14],
+		skincolors[SKINCOLOR_BLACKWAVE].ramp[15]
+	))
+	P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, AnimColors.chromeloop)
+	-- P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, blackramp, "test")
+	if (server) then server.mo.color = SKINCOLOR_BLACKWAVE end
+	-- P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, abm, "test")
+end)
 
 
--- Rotates a table by inserting the last entry to the start and removing it afterwards
-local function rotatetable(tbl, step)
-    for i = 1, step do
-        table.insert(tbl, 1, tbl[#tbl])
-        table.remove(tbl, #tbl)
+-- REFERENCE CODE FROM SWITCHKAZE
+--[[freeslot("SKINCOLOR_ANIMATED")
+skincolors[SKINCOLOR_ANIMATED] = {
+    name = "Animated",
+    accessible = true
+}
+
+local test = {
+    0,0,0,0,0,0,0,0,0,0,
+    31,31,31,31,31,31,31,31,31,31
+}
+
+local pos = 1
+addHook("ThinkFrame", do
+    pos = $<#test and $1+1 or 1
+    for i=0,15
+        skincolors[SKINCOLOR_ANIMATED].ramp[i] = test[((pos+i)%#test)+1]
     end
-end
-
-
-
-local function M_AnimColorThink(skinColor, animRamp, step)
-	rotatetable(animRamp, step)
-	skincolors[skinColor].ramp = animRamp
-end
-
-rawset(_G, "M_ConvertRampAnim", M_ConvertRampAnim)
-rawset(_G, "M_AnimColorThink", M_AnimColorThink)
+end)--]]
