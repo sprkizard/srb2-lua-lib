@@ -33,29 +33,18 @@ AnimColors.chromeloop = {
 	},
 }
 
---[[local blackwavepos = 1
-
+--[[
 32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,
 		46,45,44,43,42,41,40,39,38,37,36,35,34,33
-
-local anim_blackwave = {
-	{0,0,0,0,0,0,0,0,0,0},
-	{31,31,31,31,31,31,31,1,1,1}
-}
 
 local blackramp = {
 	0,0,0,0,0,0,0,0,0,0,
 	31,31,31,31,31,31,31,31,31,31
 }
 
-local abm = {2,4,6,8,10,12,14,16,18,20,22,24,26,28,30}--]]
--- local abm = {10,20,30,40,50,60,70,80,90,100,110,120,130,140,150}
+local abm = {10,20,30,40,50,60,70,80,90,100,110,120,130,140,150}
+--]]
 
--- local ColorRamps = {}
--- ColorRamps.blackwave = {
--- 	ramp = {}
--- }
-local rtime = 0
 
 local function P_AnimateSkinColor(skincolornum, animdef)
 
@@ -87,12 +76,7 @@ local function P_AnimateSkinColor(skincolornum, animdef)
 end
 
 addHook("ThinkFrame", function()
-	local _ramp = skincolors[SKINCOLOR_BLACKWAVE].ramp
-	-- print(_ramp[1])
 
-	--[[for i=0,#skincolors[SKINCOLOR_BLACKWAVE].ramp-1 do
-		print(skincolors[SKINCOLOR_BLACKWAVE].ramp[i])
-	end--]]
 	print(string.format("{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d}", 
 		skincolors[SKINCOLOR_BLACKWAVE].ramp[0],
 		skincolors[SKINCOLOR_BLACKWAVE].ramp[1],
@@ -111,10 +95,12 @@ addHook("ThinkFrame", function()
 		skincolors[SKINCOLOR_BLACKWAVE].ramp[14],
 		skincolors[SKINCOLOR_BLACKWAVE].ramp[15]
 	))
+
 	P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, AnimColors.chromeloop)
 	-- P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, blackramp, "test")
+
 	if (server) then server.mo.color = SKINCOLOR_BLACKWAVE end
-	-- P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, abm, "test")
+
 end)
 
 
