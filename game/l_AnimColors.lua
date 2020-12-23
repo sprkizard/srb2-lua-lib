@@ -2,8 +2,11 @@
 * l_AnimColors.lua
 * (sprkizard)
 * (July 10, 2020 14:35)
-* Desc: -- Takes a list of ramps, and mashes them together into
-		an animtable for skincolor ramps (unsafe?)
+* (Dec 23, 2020 00:00)
+* Desc: Takes a list of palette/ramp indices and automatically
+		creates an animated skincolor from them
+
+		For a list of skincolors:
 		https://wiki.srb2.org/wiki/List_of_skin_colors
 
 * Usage: (See example skin Dreamy or Blackwave)
