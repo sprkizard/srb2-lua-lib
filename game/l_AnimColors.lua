@@ -184,15 +184,7 @@ AnimColors.rainbowwave = {
 	},
 }
 
---[[
 
-local blackramp = {
-	0,0,0,0,0,0,0,0,0,0,
-	31,31,31,31,31,31,31,31,31,31
-}
-
-local abm = {10,20,30,40,50,60,70,80,90,100,110,120,130,140,150}
---]]
 
 
 local function P_AnimateSkinColor(skincolornum, animdef)
@@ -253,59 +245,28 @@ local function P_AnimateSkinColor(skincolornum, animdef)
 			skincolors[skincolornum].ramp = animdef.ramp[animdef.startpos]
 		end
 
-	elseif (animdef.style == "shift") then
+	--[[elseif (animdef.style == "shift") then
 
 		-- The original scroll error is so silly that it should be kept as a type
 		animdef.startpos = ($ < #animdef.ramp) and $1+1 or 1
 
 		skincolors[skincolornum].ramp[(leveltime % 16)] = animdef.ramp[(animdef.startpos % #animdef.ramp)+1]
-	
-	--[[elseif (antype == "flatscroll") then
-		skincolors[skincolornum].ramp[(leveltime % max)] = ramp[(leveltime/max % #ramp)+1]
-	elseif(antype == "flatflash") then
-		for i=0,max do
-			skincolors[skincolornum].ramp[i] = ramp[leveltime % #ramp]
-		end
-	elseif (antype == "flatbounce") then
-		for i=0,max-1 do
-			local b = abs(cos(ANG1*leveltime)*#ramp)/FRACUNIT
-			skincolors[skincolornum].ramp[i] = ramp[b]
-		end--]]
+	--]]
 	end
 end
 
+-- Thinkframe hook (duh)
 addHook("ThinkFrame", function()
-
-	--[[print(string.format("{%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d}", 
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[0],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[1],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[2],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[3],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[4],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[5],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[6],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[7],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[8],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[9],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[10],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[11],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[12],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[13],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[14],
-		skincolors[SKINCOLOR_BLACKWAVE].ramp[15]
-	))--]]
 
 	P_AnimateSkinColor(SKINCOLOR_GOLDRAMPWAVE, AnimColors.r_goldwave)
 	P_AnimateSkinColor(SKINCOLOR_GOLDWAVE, AnimColors.goldwave)
 	P_AnimateSkinColor(SKINCOLOR_GOLDBOUNCE, AnimColors.superbounce)
 	P_AnimateSkinColor(SKINCOLOR_REDWAVE, AnimColors.redwave)
 	P_AnimateSkinColor(SKINCOLOR_CRAINBOW, AnimColors.rainbowwave)
-	-- P_AnimateSkinColor(SKINCOLOR_BLACKWAVE, blackramp, "test")
-
-	-- if (server) then server.mo.color = SKINCOLOR_BLACKWAVE end
 
 end)
 
+-- Create a global for this
 rawset(_G, "P_AnimateSkinColor", P_AnimateSkinColor)
 
 
