@@ -14,6 +14,8 @@
 
 rawset(_G, "Event", {})
 
+-- rawset(_G, "FESM", Event)
+
 -- Variable to print certain debug stuff related to the event
 Event.printlog = false
 
@@ -158,6 +160,30 @@ function Event.getuser(eventsource)
 	return eventsource._user
 end
 
+-- Get the current tag/step of the scope this is called in
+function Event.gettag(event, stepnum)
+	return event._self.step
+end
+
+-- Go to the tag number given in the current state
+function Event.gototag(event, stepnum)
+	event._self.step = stepnum
+end
+
+-- TODO: seek and stop/resume all if needed
+function Event.stop(event)
+	event._self.status = "stopped"
+end
+
+function Event.pause(event)
+	event._self.status = "suspended"
+end
+
+function Event.resume(event)
+	event._self.status = "running"
+end
+
+
 -- Forces an event to wait until a set time
 local function wait(event, time)
 
@@ -224,6 +250,12 @@ local function signal(signalname)
 		end)()
 	end
 end
+
+-- function Event.for(start, max, skip, func)
+-- 	for start, max, skip do
+		
+-- 	end
+-- end
 
 -- Does a function once on an event during a wait()
 -- (for multiple, use doOrder instead)
@@ -302,6 +334,9 @@ local function RunEvents(event)
 				if (Event.printlog) then
 					print(string.format("%d/%d %s[%s%s] - [w%d] [lt%d] [Action]:", evclass.step, #evclass.events, evclass.name, evclass.status, "|"..evclass.signal, evclass.index._idletime, evclass.index._looptrack))
 				end
+
+				-- the _entire_ state is stopped, nothing runs
+				if evclass.status == "stopped" then return end
 
 				-- TODO: what if suspended, and we want the step function to run only once?
 				do evclass.events[evclass.step]() end -- Run functions (:
