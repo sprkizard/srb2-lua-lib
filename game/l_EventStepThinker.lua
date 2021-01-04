@@ -43,7 +43,8 @@ function Event.new(eventname, ...)
 	}
 	
 	-- Reference our event list into the event class
-	-- All event functions will reference the index for using variables
+	-- All event functions will reference its own index for using variables
+	-- TODO: while this works, find another way to keep this the same, but store functions elsewhere
 	local funclist = {unpack(...)}
 	for i=1,#funclist do
 		_event.events[i] = do funclist[i](_event.index) end
@@ -311,23 +312,22 @@ end)
 
 -- Handles running events similar to coroutines
 local function RunEvents(event)
-	-- print(#Running_Events)
+
 	for key,evclass in pairs(Running_Events) do
+		
 		-- The status is dead, remove
 		if (evclass.status == "dead") then
 			Running_Events[key] = nil
 		end
-		-- Do not run if the status is normal or dead
+
+		-- Do not run if the status is normal or dead. Continue next iteration if so.
 		(function()
 			if not (evclass.status == "normal" or evclass.status == "dead") then
-				-- TODO: solve for-end (?)
-				-- for i=1,#evclass.events do
+
 				-- Set events to dead once they reach the end of the list
 				if (evclass.step > #evclass.events) then
 					evclass.status = "dead"
 					return
-				-- elseif (evclass.status == "suspended") then
-				-- 	break
 				end
 
 				-- Print some useful info to the log when enabled
@@ -341,73 +341,29 @@ local function RunEvents(event)
 				-- TODO: what if suspended, and we want the step function to run only once?
 				do evclass.events[evclass.step]() end -- Run functions (:
 
-				-- the event is waiting
+				-- the event is waiting/yielded
 				if evclass.status == "suspended" then return end
 
 				-- Progress the step of the list
 				evclass.step = $1+1
 				evclass.index._looptrack = 0
-				-- end
+
 			end
 		end)()
 	end
-	--print(#Running_Events)
-	-- for k,v in pairs(Running_Events) do
-	-- 	for i=1,#v do
-	-- 		do v[i]()5 end
-	-- 	end
-	-- end
 end
 
---[[addHook("NetVars", function(network)
-    local running_eventCount = #Running_Events -- This will get overridden shortly for the client, so it's ok
-    running_eventCount = network(running_eventCount)
-    for i = 1, running_eventCount do
-        Running_Events[i] = network(Running_Events[i])
-    end
-end)--]]
-
---[[Mock code!
-
-local eventlist = {} --global list
-local eventids = 0
-local running_events -- events in thinkframe
-
-event.new(name, function)
-
-	eventlist[name] = function
-end
-
-event.start(name or function)
-	eventid = $+1
-	???	
-end
---]]
-
---[[
-.start({
-	function(event)
-		event.p = 1
-	end,
-	function(event)
-		event.p = $1+1
-	end,
-	function(event)
-		print(event.p)
-	end,
-})
---]]
 
 -- Hooks
 
 -- The structure of each state machine should be:
--- Tab 1: 
+-- Saved 1: 
 -- {
 -- 	name: {name, status, step, signal, index{}, funcs{...}},
 -- ...
 -- }
 
--- Tab 2:
+-- Running 2:
 -- {
 -- 	{name, status, step, signal, index{}, funcs{...}},
 -- 	...
@@ -456,6 +412,7 @@ addHook("MapLoad", function(gamemap)
 			-- Event.newsub(mapheaderinfo[gamemap].loadevent:gsub("%z", ""), player)
 		end
 	end
+
 	-- Run a 'global' event
 	-- TODO: stated far above, but thinking about it further- if globals are
 	-- just started every time with the same exact content, does it matter
@@ -485,57 +442,4 @@ rawset(_G, "waitUntil", waitUntil)
 rawset(_G, "signal", signal)
 rawset(_G, "waitSignal", waitSignal)
 
---[[
-function event.new(eventname, e)
-	local r = {}
 
-	r.e = e
-
-	EventList[eventname] = r
-	return r
-end
-
-function event.start(eventname, f)
-
-	EventList[eventname].e()
-
-end
-
-local function wait(time)
-	time = $1-1
-	if time then 
-		return
-	end
-end
-
-event.new("test", function()
-	print("1")
-	wait(45*TICRATE)
-	print("2")
-end)
---]]
-
-
--- end result
---  be able to store variables in a state varaible to use across the same event or different
---  be able to start a new event from a table event.start(..., {function})
--- 9-6-2020: success
-
---[[
-local stepbystep = {
-
-	function() print("Test") end,
-	function() print("Test") end,
-
-}
-
-addHook("ThinkFrame", function()
-
-	for i=1,#stepbystep do
-		do
-			stepbystep[i]()
-		end
-	end
-
-end)
---]]
