@@ -34,6 +34,8 @@ function Event.new(eventname, ...)
 	_event.status = "normal" -- mimic coroutine statuses (dead|suspended|running|normal)
 	_event.step = 1 -- the current step in the event (might be easier than for-do?)
 	_event.signal = "" -- signal to wait on if given one
+	_event.tags = {} -- Tags for jumping around inside of a state (like goto)
+
 	 -- where all of our class variables can be traded inside the event
 	_event.index = {
 		_self = _event, -- a reference to the event itself
@@ -83,6 +85,7 @@ function Event.start(eventname, args)
 	ev.status = "running" -- Set the status to running
 	ev.signal = "" -- reset the signal, will re-activate when given another
 	ev.step = args and args.order or 1 -- Advance to a future step on start? (use with caution)
+	ev.tags = {} -- tags
 	ev.index._user = args and args.user or nil -- set the thing 'using' the event
 	ev.index._copy = args and args.copy or nil -- set the copy field (for variable transfers)
 	ev.index._idletime = 0 -- TODO: timer problem on reload during wait????
@@ -135,6 +138,13 @@ function Event.destroy(eventname, seekall)
 	end
 end
 
+-- Destroys a group of states all in one go
+function Event.destroygroup(eventnamelist, seekall)
+	for i=1,#eventnamelist do
+		Event.destroy(eventnamelist[i], seekall)
+	end
+end
+
 -- Transfers all of the variables from the source event
 -- will work with other objects, but best used to reference another event
 function Event.transfercontent(indexsource, indextdest)
@@ -161,14 +171,38 @@ function Event.getuser(eventsource)
 	return eventsource._user
 end
 
--- Get the current tag/step of the scope this is called in
+-- Get the current tag/step number of the scope this is called in
 function Event.gettag(event, stepnum)
 	return event._self.step
 end
 
+-- Sets a tag inside of the state
+function Event.settag(event, tagname)
+	event._self.tags[tagname] = event._self.step
+	
+	if (Event.printlog) then
+		print(string.format("Set tag id %d on tag[%s]", event._self.step, tagname))
+	end
+	
+	return event._self.step
+end
+
 -- Go to the tag number given in the current state
-function Event.gototag(event, stepnum)
-	event._self.step = stepnum
+function Event.gototag(event, tagname)
+	event._self.step = event._self.tags[tagname]-1
+
+	if (Event.printlog) then
+		print(string.format("Going to tag id %d on tag[%s]", event._self.step+1, tagname))
+	end
+end
+
+-- Go to a tag number if a condition is reached
+function Event.gototaguntil(event, tagname, cond)
+	if not (cond) then
+		Event.gototag(event, tagname)
+	else
+		-- do nothing
+	end
 end
 
 -- TODO: seek and stop/resume all if needed
