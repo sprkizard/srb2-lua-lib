@@ -1,15 +1,14 @@
 Axis2D script
-by chi.miru and RedEnchilada
-Version 1.2
+by sprki_zard and Fickleheart
+Version 1.3 (Alpha)
 Setup documentation
 ---------------
 
-Loading into a WAD:
+Loading into a PK3/WAD:
 
-For testing, adding the script separately will work. Otherwise, load Axis2D.lua into
-your WAD with any lump name that triggers the game to load it as a Lua script. (The
-suggested lump name is LUA_AX2D.) Refer to the example WAD for a sample on how to set
-this up.
+For testing, adding the script separately will work. Otherwise, load l_Axis2D.lua into
+your PK3 by dropping it inside of the Lua sub-folder. For WAD files, use any lump name that triggers
+the game to load it as a Lua script. (The suggested lump name is LUA_AX2D.)
 
 
 
@@ -29,6 +28,33 @@ as far back as needed to avoid this scenario.
 
 Linedef types:
 
+New Behaviour (> 2.2):
+Linedef Executor - Call Lua Function (443): Write "P_Axis2D" (case-insensitive)
+across the textures. The tag is the axis number to snap to. Call this
+with a tag of 0 to exit Axis2D mode and go back to 3D.
+
+-- Axis2D Options (443):
+
+-- Tag: The tag is the axis number to use this with.
+   
+-- [5] EFFECT 1 (E1): The frontsector floor height will set the camera distance
+    from the player (It defaults to 448 otherwise).
+   
+-- [6] No Climb: If checked, this is an absolute angle, otherwise it's relative
+    to the normal camera angle.
+   
+-- [7] EFFECT 2 (E2): The backsector floor height will set the camera's height
+    relative to the player.
+
+-- [8] EFFECT 3 (E3): The x offset texture field of the lindef's frontside
+    will determine the angle of the camera. The angle of the
+    linedef is the camera angle by default when unchecked (in reverse).
+    
+-- [9] EFFECT 2 (E4): The y offset texture field of the lindef's frontside
+    will determine if the camera aims either up or downwards using the player's
+    aiming field.
+
+Legacy Behaviour (Backwards Compatability):
 Linedef Executor - Call Lua Function (443): Write "P_DoAngleSpin" (case-insensitive)
 across the textures. (One way to do this is writing "P_DOANGL" in the upper texture
 and "ESPIN" in the mid texture.) The tag is the axis number to snap to. Call this
@@ -43,6 +69,12 @@ linedef is the camera angle (in reverse); if No Climb is checked, this is an abs
 angle, otherwise it's relative to the normal camera angle. If Effect 1 is checked,
 then the linedef's length will determine the camera distance from the player. (It
 defaults to 448 otherwise, so design your geometry around that.)
+
+
+
+Issues: Due to Axis2D not accounting for 'Simple Mode' as it was not included during
+development, players will thok backwards when using the charability CA_THOK.
+This will be addressed in the future.
 
 
 
@@ -67,5 +99,5 @@ the player may unintentionally respawn into 3D.
 
 
 
-Have fun! If this readme doesn't do a great job at explaining things, ask one of us
-on the MB or through any other means of contact you have for us!
+Have fun! If this readme doesn't do a great job at explaining things, ask sprki_zard (Varren)
+on the MB, Discord, or through any other means of contact!
