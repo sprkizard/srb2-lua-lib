@@ -35,6 +35,22 @@ local axes = {lastmap = 0}
 
 
 
+-- Checks what control style is currently active
+function axis2d.IsControlStyle(player)
+	
+	-- STRAFE   [0,0]
+	-- STANDARD [0,4]
+	-- SIMPLE   [2,4] sessionanalog/directionchar
+
+	if (player.pflags & PF_ANALOGMODE and PF_DIRECTIONCHAR) then 
+		return "simple"
+	elseif (player.pflags &~ PF_ANALOGMODE and player.pflags & PF_DIRECTIONCHAR) then 
+		return "standard"
+	elseif (player.pflags &~ (PF_ANALOGMODE and PF_DIRECTIONCHAR)) then 
+		return "strafe"
+	end
+
+end
 
 -- Refreshes the axis cache if needed
 function axis2d.CheckAxes()
