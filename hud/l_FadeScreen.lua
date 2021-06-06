@@ -1,5 +1,7 @@
 -- Requires: l_hudzordering.lua
+if not _G["R_AddHud"] then return end
 
+-- Legacy Version
 local function fadescreen(direction, color, speed, timescale, dontdraw)
 
     local dt = 0 -- time
@@ -29,4 +31,56 @@ local function fadescreen(direction, color, speed, timescale, dontdraw)
 
 end
 
+
+-- New Version (tables are a little safer in the event we change entire arguments...)
+local function R_ScreenFade(ftype, args)
+
+    local time = 0 -- elapsed time value
+    local timescale = args and args.timescale or 1 -- TODO: merge speed and timescale?
+    local speed = args and args.speed or 1 -- speed
+    local color = args and args.color or 0 -- color
+    
+    -- Allow the user to access the built in fadetypes with a phrase
+    if (color == "type1") then
+        color = 0xFF00
+    elseif (color == "type2") then
+        color = 0xFA00
+    elseif (color == "type3") then
+        color = 0xFB00
+    end
+
+    -- Maxstrength between palette and special values
+    local maxstrength = ((args and (args.color == 0xFF00 or args.color == 0xFA00 or args.color == 0xFB00)) and 32 or 10)
+
+    -- Inverse the time if a fade-in
+    if (ftype == "in") then time = maxstrength end
+
+    -- Send new overwritable hudlayer entry (full, clear, or default)
+    if (ftype == "full") then
+         R_AddHud("_screenfade", 99, function(v, stplyr)
+            v.fadeScreen(color, maxstrength)
+        end)
+        return
+    elseif (ftype == "_screenfade")
+        R_DeleteHud(layername)
+        return
+    else
+        R_AddHud("_screenfade", 99, function(v, stplyr)
+
+            if (leveltime % timescale == 0) then
+                if (ftype == "out") then
+                    time = min(maxstrength, $+1 * 1)
+                elseif (ftype == "in") then
+                    time = max(0, $-1 * 1)
+                else
+                    return
+                end
+            end
+            -- Only one fadescreen needed outside the if here
+            v.fadeScreen(color, time)
+        end)
+    end
+end
+
 rawset(_G, "fadescreen", fadescreen)
+rawset(_G, "R_ScreenFade", R_ScreenFade)
