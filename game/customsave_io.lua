@@ -8,7 +8,8 @@
 * Usage: Refer to - https://github.com/sprkizard/srb2-lua-lib/wiki/I-O-Easy-Custom-Save-Files
 ]]
 
-
+-- Create global name for save functions
+rawset(_G, "SaveData_I", {})
 
 
 
@@ -150,7 +151,7 @@ local enc2 = {124,533,663,123,27};
 -- Reading data
 
 -- Checks if a local file exists
-local function I_FileExists(fileStr)
+function SaveData_I.FileExists(fileStr)
 
 	local f = io.openlocal(fileStr, "r")
 	
@@ -163,7 +164,7 @@ local function I_FileExists(fileStr)
 end
 
 -- Reads a saved table into a variable from a file path
-local function I_ReadSaveFile(fileStr, decrypt)
+function SaveData_I.ReadSaveFile(fileStr, decrypt)
 	
 	local file = io.openlocal(fileStr) -- TODO: try regular open()
 	
@@ -190,7 +191,7 @@ end
 -- Writing data
 
 -- Writes a save table to the specified file path
-local function I_WriteSaveFile(fileStr, dataTable, encrypt)
+function SaveData_I.WriteSaveFile(fileStr, dataTable, encrypt)
 	
 	local file = io.openlocal(fileStr, "w+") -- TODO: try regular open()
 
@@ -237,9 +238,4 @@ COM_AddCommand("writefile", function()
 end)
 
 
--- Expose
-rawset(_G, "I_FileExists", I_FileExists)
-rawset(_G, "I_WriteSaveFile", I_WriteSaveFile)
-rawset(_G, "I_ReadSaveFile", I_ReadSaveFile)
--- rawset(_G, "Serialize", Serialize)
--- rawset(_G, "Deserialize", Deserialize)
+
