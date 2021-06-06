@@ -62,7 +62,7 @@ local function R_ScreenFade(ftype, args)
         end)
         return
     elseif (ftype == "clear")
-        R_DeleteHud(layername)
+        R_DeleteHud("_screenfade")
         return
     else
         R_AddHud("_screenfade", 99, function(v, stplyr)
