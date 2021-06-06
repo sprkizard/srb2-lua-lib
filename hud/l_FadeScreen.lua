@@ -61,7 +61,7 @@ local function R_ScreenFade(ftype, args)
             v.fadeScreen(color, maxstrength)
         end)
         return
-    elseif (ftype == "_screenfade")
+    elseif (ftype == "clear")
         R_DeleteHud(layername)
         return
     else
