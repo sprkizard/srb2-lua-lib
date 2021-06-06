@@ -196,6 +196,10 @@ function Event.gototag(event, tagname)
 	end
 end
 
+function Event.rewindtag(event, tagname)
+	Event.gototag(event, tagname)
+end
+
 -- Go to a tag number if a condition is reached
 function Event.gototaguntil(event, tagname, cond)
 	if not (cond) then
@@ -346,7 +350,7 @@ end)
 
 -- Handles running events similar to coroutines
 local function RunEvents(event)
-
+	-- TODO use ipairs
 	for key,evclass in pairs(Running_Events) do
 		
 		-- The status is dead, remove
