@@ -1,5 +1,5 @@
--- Requires: l_hudzordering.lua
-if not _G["R_AddHud"] then return end
+-- Do not add this twice if it is in another file, please
+if _G["R_ScreenFade"] then return end
 
 -- Legacy Version
 local function fadescreen(direction, color, speed, timescale, dontdraw)
@@ -35,6 +35,9 @@ end
 -- New Version (tables are a little safer in the event we change entire arguments...)
 local function R_ScreenFade(ftype, args)
 
+    -- Requires: l_hudzordering.lua
+    if not _G["R_AddHud"] then print("This R_ScreenFade requires l_hudzordering.lua to work!") return end
+
     local time = 0 -- elapsed time value
     local timescale = args and args.timescale or 1 -- TODO: merge speed and timescale?
     local speed = args and args.speed or 1 -- speed
@@ -50,7 +53,7 @@ local function R_ScreenFade(ftype, args)
     end
 
     -- Maxstrength between palette and special values
-    local maxstrength = ((args and (args.color == 0xFF00 or args.color == 0xFA00 or args.color == 0xFB00)) and 32 or 10)
+    local maxstrength = ((args and (color == 0xFF00 or color == 0xFA00 or color == 0xFB00)) and 32 or 10)
 
     -- Inverse the time if a fade-in
     if (ftype == "in") then time = maxstrength end
