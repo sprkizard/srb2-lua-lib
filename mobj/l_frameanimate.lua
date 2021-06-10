@@ -23,7 +23,7 @@ function FrameAnim.add(animname, animator, nsprite, startf, endf, args)
 
 	-- Start by setting the initial sprite and frame
 	animator.sprite = nsprite
-	animator.frame = startf
+	animator.frame = R_Char2Frame(startf) --startf
 
 	-- Throw it into the playing list
 	table.insert(FrameAnim.playing, 
@@ -31,10 +31,10 @@ function FrameAnim.add(animname, animator, nsprite, startf, endf, args)
 		name=animname,
 		mobj=animator,
 		sprite=nsprite,
-		startframe=startf,
-		endframe=endf,
-		loop=(args and args.loop) or endf, -- if no loop, set to end frame
-		speed=(args and args.speed) or 1,
+		startframe=R_Char2Frame(startf), --startf,
+		endframe=R_Char2Frame(endf), --endf,
+		loop=(args and args.loop) or R_Char2Frame(endf)*((args and args.delay) or 1), -- if no loop, set to end frame (ef*delay for slower animations)
+		frameskip=(args and args.frameskip) or 1, -- TODO: implement frameskip
 		delay=(args and args.delay) or 1,
 		paused=false,
 		deleted=false,
@@ -76,6 +76,11 @@ function FrameAnim.checkexisting(animname)
 	return FrameAnim.seek(animname)
 end
 
+-- Suspends an event until the animation ends
+function FrameAnim.suspend_finished(event, animname)
+	if not _G["Event"] then print("Event script is not loaded!") return end
+	if (FrameAnim.checkexisting(animname)) then Event.pause(event) else Event.resume(event) end
+end
 
 addHook("ThinkFrame", function()
 
@@ -88,6 +93,11 @@ addHook("ThinkFrame", function()
 			table.remove(FrameAnim.playing, i)
 		end
 
+		-- no mobj means to not continue
+		if anim and not (anim.mobj and anim.mobj.valid) then 
+			anim.deleted = true
+		end
+
 		-- Continue next iteration if animation is set to be deleted, otherwise continue
 		(function()
 			if (anim and not anim.deleted) then
@@ -98,7 +108,26 @@ addHook("ThinkFrame", function()
 				-- the animation is paused
 				if (anim.paused) then return end
 
-				-- Play the sprite's frames by set speed and delay
+				if (anim.loop > 0) then
+
+					-- Play the sprite's frames by set speed and delay
+					if (leveltime % anim.delay == 0) then
+						anim.mobj.frame = $1+1 * anim.frameskip
+					end
+
+					-- Reset the framecount to the beginning
+					if (anim.mobj.frame > anim.endframe) then
+						anim.mobj.frame = anim.startframe
+					end
+
+					anim.loop = $1-1
+				else
+					-- When our sprite loop time has ended, set the animation to be removed
+					anim.deleted = true
+					-- print(string.format("animation [%s] finished", anim.name))
+				end
+
+				--[[-- Play the sprite's frames by set speed and delay
 				if (leveltime % anim.delay == 0) then
 					anim.mobj.frame = $1+1 * anim.speed
 				end
@@ -115,7 +144,7 @@ addHook("ThinkFrame", function()
 					return
 				else
 					anim.loop = $1-1
-				end
+				end--]]
 			end
 		end)()
 	end
@@ -133,7 +162,7 @@ end)
 		-- FrameAnim.add("name", s, SPR_EGGM, A, F)
 		-- FrameAnim.add("name", s, SPR_EGGM, V, W, {loop=2*TICRATE})
 		-- FrameAnim.add("name", s, SPR_PIKE, A, P)
-		FrameAnim.add("name", s, SPR_GFZD, 0, 31, {loop=10*TICRATE, speed=1})
+		FrameAnim.add("name", s, SPR_GFZD, 0, 31, {loop=10*TICRATE})
 	end
 
 	if leveltime == 7*TICRATE then 
