@@ -39,7 +39,7 @@ local function R_ScreenFade(ftype, args)
     if not _G["R_AddHud"] then print("This R_ScreenFade requires l_hudzordering.lua to work!") return end
 
     local time = 0 -- elapsed time value
-    local timescale = args and args.timescale or 1 -- TODO: merge speed and timescale?
+    local delay = args and args.delay or 1 -- TODO: merge speed and delay?
     local speed = args and args.speed or 1 -- speed
     local color = args and args.color or 0 -- color
     
@@ -70,7 +70,7 @@ local function R_ScreenFade(ftype, args)
     else
         R_AddHud("_screenfade", 99, function(v, stplyr)
 
-            if (leveltime % timescale == 0) then
+            if (leveltime % delay == 0) then
                 if (ftype == "out") then
                     time = min(maxstrength, $+1 * 1)
                 elseif (ftype == "in") then
