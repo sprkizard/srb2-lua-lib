@@ -15,36 +15,33 @@
 
 ]]
 
-local function P_RadiusExplode(source, speed, particleType, params)
+local function P_RadiusExplode(position, wavespeed, args)
 
     -- Load extra parameters for further customization if needed
-    source.skipParam = (params and params.skip) or 32
-    source.scaleParam = (params and params.scale) or FRACUNIT
-    --source.destscaleParam = (params and params.destscale) or FRACUNIT
-    source.fuseParam = (params and params.fuse) or nil
-    source.funcParam = (params and params.func) or nil
+    local angleskip = (args and args.angleskip) or 32
+    local mobjtype = (args and args.mobjtype or MT_EXPLODE)
 
-    if (source.valid) then
+    -- if position is a mobj and is not valid, do nothing
+    if type(position) == "userdata" and not (position and position.valid) then return end
 
-        -- Form a circle using angles
-        for newAngle=1*FRACUNIT,360*FRACUNIT, source.skipParam*FRACUNIT do
+    for angle=1, 360, angleskip do
 
-            source.explodeForceFx = P_SpawnMobj(source.x, source.y, source.z, particleType or MT_EXPLODE)
-            source.explodeForceFx.scale = source.scaleParam
+        local explode = P_SpawnMobj(position.x, position.y, position.z, mobjtype)
 
-            -- Set an object fuse if you use something that does not disappear easily
-            if (source.fuseParam) then
-                source.explodeForceFx.fuse = source.fuseParam
-            end
+        explode.scale = (args and args.scale) or FU
 
-            -- Call a callback function
-            if (source.funcParam) then
-                do source.funcParam(source.explodeForceFx) end
-            end
-
-            -- Force the objects outward
-            P_InstaThrust(source.explodeForceFx, FixedAngle(newAngle), speed*FRACUNIT)
+        -- Set a fuse for long lasting objects
+        if (args and args.fuse) then
+            explode.fuse = args.fuse
         end
+
+        -- Call a callback function
+        if (args and args.callback) then
+            do args.callback(explode, angle, angleskip) end
+        end
+
+        -- Force the objects outward
+        P_InstaThrust(explode, FixedAngle(angle*FU), wavespeed)
     end
 end
 
