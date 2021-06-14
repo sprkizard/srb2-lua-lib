@@ -35,9 +35,9 @@ function MobjMover.moveto(n, source, mtarget, args)
 	{
 		name=n,
 		mobj=source,
-		angle=args.angle,
+		angle=args and args.angle,
 		startpos={x=source.x, y=source.y, z=source.z},
-		arc=args.arc,
+		arc=args and args.arc,
 		target=mtarget,
 		speed=tspeed,
 		movepercent=_movepercent,
@@ -144,36 +144,36 @@ function MobjMover.Thinker()
 end
 
 -- Example code
--- addHook("ThinkFrame", function()
--- MobjMover.Thinker()
--- end)
+--[[addHook("ThinkFrame", function()
+MobjMover.Thinker()
+end)
 
--- addHook("ThinkFrame", function()
--- 	-- Moves directly to 0,0,56
--- 	if leveltime == 2*TICRATE then
--- 		server.mo.s = P_SpawnMobj(server.mo.x, server.mo.y, server.mo.z, MT_THOK)
--- 		local sd = P_SpawnMobj(0, 0, 56*FU, MT_THOK)
--- 		server.mo.s.tics = FU
--- 		server.mo.s.sprite = SPR_EGGM
--- 		sd.tics = FU
--- 		sd.sprite = SPR_DRWN
--- 		sd.scale = 2*FU
--- 		MobjMover.moveto("test", server.mo.s, {x=0,y=0,z=56*FU}, {angle=0})
--- 	end
--- 	-- Starts a new, arc movement after the first
--- 	if leveltime == 6*TICRATE then
--- 		local sd = P_SpawnMobj(0, 2000*FU, 56*FU, MT_THOK)
--- 		sd.tics = FU
--- 		sd.sprite = SPR_DRWN
--- 		sd.scale = 2*FU
--- 		MobjMover.moveto("test", server.mo.s, {x=0,y=2000*FU,z=56*FU}, {arc={vert=128*FU}})
--- 	end
--- 	-- Pauses movement for 3 seconds
--- 	if (leveltime == 10*TICRATE) then
--- 		MobjMover.pause("test", true)
--- 	end
--- 	-- Unpauses and finishes
--- 	if (leveltime == 13*TICRATE) then
--- 		MobjMover.pause("test", false)
--- 	end
--- end)
+addHook("ThinkFrame", function()
+	-- Moves directly to 0,0,56
+	if leveltime == 2*TICRATE then
+		server.mo.s = P_SpawnMobj(server.mo.x, server.mo.y, server.mo.z, MT_THOK)
+		local sd = P_SpawnMobj(0, 0, 56*FU, MT_THOK)
+		server.mo.s.tics = FU
+		server.mo.s.sprite = SPR_EGGM
+		sd.tics = FU
+		sd.sprite = SPR_DRWN
+		sd.scale = 2*FU
+		MobjMover.moveto("test", server.mo.s, {x=0,y=0,z=56*FU}, {angle=0})
+	end
+	-- Starts a new, arc movement after the first
+	if leveltime == 6*TICRATE then
+		local sd = P_SpawnMobj(0, 2000*FU, 56*FU, MT_THOK)
+		sd.tics = FU
+		sd.sprite = SPR_DRWN
+		sd.scale = 2*FU
+		MobjMover.moveto("test", server.mo.s, {x=0,y=2000*FU,z=56*FU}, {arc={vert=128*FU}})
+	end
+	-- Pauses movement for 3 seconds
+	if (leveltime == 10*TICRATE) then
+		MobjMover.pause("test", true)
+	end
+	-- Unpauses and finishes
+	if (leveltime == 13*TICRATE) then
+		MobjMover.pause("test", false)
+	end
+end)--]]
