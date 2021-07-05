@@ -77,7 +77,7 @@ end
 
 -- Checks if object is still travelling
 function MobjMover.ismoving(n)
-	return MobjMoverseek(n)
+	return MobjMover.seek(n)
 end
 
 
