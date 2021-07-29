@@ -12,54 +12,122 @@
 
 ]]
 
-rawset(_G, "Event", {})
+rawset(_G, "Event", {debug=true})
+rawset(_G, "EVE", Event)
 
--- rawset(_G, "FESM", Event)
 
--- Variable to print certain debug stuff related to the event
-Event.printlog = false
+-- Prints a debug message
+function Event.printdebug(msg)
+	if (Event.debug) then print(msg) end
+end
 
--- The events created on initialization or anonymously
-local EventList = {}
+function Event.debugfunc(f)
+	if (Event.debug) then f() end
+end
 
--- global table for running events
-local Running_Events = {}
+-- The events created on initialization
+rawset(_G, "EventList",{events={},subevents={}})
 
--- Creaets a new event
-function Event.new(eventname, ...)
-	-- Create an event class for each new event
-	local _event = {events = {}}
+-- global table for running events (disable for now)
+-- rawset(_G, "Running_Events",{})
+
+-- Reduce redundancy when looking through the event tables
+function Event.searchtable(f, issubevent)
+	if not issubevent then
+		for k,evclass in pairs(EventList.events) do
+		(function()
+			do f(k, evclass) end
+		end)()
+		end
+	else
+		for k,evclass in pairs(EventList.subevents) do
+		(function()
+			do f(k, evclass) end
+		end)()
+		end
+	end
+end
+
+-- Creates a new event
+function Event.new(eventname, ftable)
+
+	-- Create an event object for each new event
+	local _event = {}
 
 	_event.name = eventname
 	_event.status = "normal" -- mimic coroutine statuses (dead|suspended|running|normal)
-	_event.step = 1 -- the current step in the event (might be easier than for-do?)
+	_event.step = 1 -- the current step position in the state list (might be easier than for-do?)
 	_event.signal = "" -- signal to wait on if given one
 	_event.tags = {} -- Tags for jumping around inside of a state (like goto)
+	_event.sleeptime = 0 -- the event wait timer
+	_event.looptrack = 0 -- the event looptracker (can be used for anything eg. doOnce)
 
-	 -- where all of our class variables can be traded inside the event
-	_event.index = {
-		_self = _event, -- a reference to the event itself
-		_user = nil, -- the user of the event (eg. player, mobj, variable)
-		_idletime = 0, -- the event wait timer
-		_looptrack = 0, -- the event looptracker (can be used for anything eg. doOnce)
+	-- Create a container for variables
+	_event.vars = {
+		-- TODO: reference to only what we will allow in the event's 'self' property
+		-- _self = _event,
+		-- TODO: find another use for user since we no longer transfer variables using a function
+		-- the user of the event (eg. player, mobj, variable)
+		_user = nil,
 	}
-	
-	-- Reference our event list into the event class
-	-- All event functions will reference its own index for using variables
-	-- TODO: while this works, find another way to keep this the same, but store functions elsewhere
-	local funclist = {unpack(...)}
-	for i=1,#funclist do
-		_event.events[i] = do funclist[i](_event.index) end
-		--table.insert(_event.events, (do funclist[i](_event.index) end))
+	_event.states = {}
+
+	-- Reference our event list into the event object
+	-- Assign arguments to the functions to access these fields (variable, event, [parentevent])
+	for k,v in pairs(ftable) do
+
+		if type(v) == "function" then
+			-- add the functions to the state list with arguments (container, event)
+			_event.states[tonumber(k)] = do ftable[tonumber(k)](_event.vars, _event) end
+		elseif type(v) == "table" then
+			
+			-- Sub-Events in the ftable should be added into the subevents table separately
+			-- (they will inherit the parent event's variables, etc but still act independently)
+			local _subevent = {name=k,status="normal",step=1,signal="",tags={},sleeptime=0,states={}}
+
+			-- add the functions to the state list with arguments (container, subevent, [parentevent])
+			for i=1,#v do
+				_subevent.states[i] = do v[i](_event.vars, _subevent, _event) end
+			end
+
+			-- Add subevents into the subevent table
+			EventList.subevents[k] = _subevent
+		end
 	end
-	
-	-- Store event class and return to objects
-	EventList[eventname] = _event
+
+	-- Add events into the event table
+	EventList.events[eventname] = _event
 	return _event
 end
 
+-- private functions to reset event properties
+function Event.__setupEvent(ev)
+	ev.status = "running" -- Set the event status to running
+	ev.signal = "" -- reset the event signal, will re-activate when given another
+	ev.step = 1 -- Reset setp count
+	ev.tags = {} -- tags
+	ev.sleeptime = 0 -- Reset wait time
+end
+
+function Event.__endEvent(ev)
+	ev.sleeptime = 0
+	ev.looptrack = 0
+	ev.status = "dead"
+	-- Running_Events[re] = nil
+end
+
+function Event.__resetEvent(ev)
+	ev.status = "normal"
+	ev.step = 1
+	ev.signal = ""
+	ev.tags = {}
+	ev.sleeptime = 0
+	ev.looptrack = 0
+end
+
+-- TODO: find a new use for this since anonymous functions are dead
 -- Creates a userdata block'name' (usually when printed from tostring)
-local function randomUserBlockName()
+--[[local function randomUserBlockName()
 	local str = "0"
 	for i=1,7 do
 		-- Randomize
@@ -68,74 +136,89 @@ local function randomUserBlockName()
 		str = str .. string.char(bits[RandomKey])
 	end
 	return str
-end
+end--]]
 
--- Runs an event (better used on a wide scope) 
+-- Runs an event
 function Event.start(eventname, args)
-	assert(EventList[eventname], "Event '" .. eventname .. "' does not exist!")
 
-	local ev = EventList[eventname]
+	-- Instead of breaking the entire script trying to warn, just don't play it
+	if not EventList.events[eventname] then
+		print(string.format("\x81 Event [%s] does not exist!", eventname))
+		return
+	end
 
-	-- TODO: this needs to be deepcopied to have all fields be copied here and matched correctly
-	--[[local ev = {}
-	for k,v in pairs(EventList[eventname]) do
-		ev[k] = v
-	end--]]
+	local ev = EventList.events[eventname]
 
-	ev.status = "running" -- Set the status to running
-	ev.signal = "" -- reset the signal, will re-activate when given another
-	ev.step = args and args.order or 1 -- Advance to a future step on start? (use with caution)
-	ev.tags = {} -- tags
-	ev.index._user = args and args.user or nil -- set the thing 'using' the event
-	ev.index._copy = args and args.copy or nil -- set the copy field (for variable transfers)
-	ev.index._idletime = 0 -- TODO: timer problem on reload during wait????
-	ev.index._looptrack = 0 -- TODO: above
-
-	-- Clone the table to prevent editing the direct reference
-	table.insert(Running_Events, ev)
+	-- Setup the event from the beginning
+	Event.__setupEvent(ev)
+	
+	-- Get everything in args to be added to vars, nullifying the _user variable
+	if args then
+		for k,v in pairs(args) do
+			(function()
+				ev.vars[k] = v
+			end)()
+		end
+	end
 end
 
--- Runs a sub event (better used on an individual scope)
-function Event.newsub(subeventname, args, funcs)
-	-- TODO: accept nil string name
-	-- Create a random name and start it instantly
-	local subname = subeventname.."_"..randomUserBlockName()
-	Event.new(subname, funcs)
-	Event.start(subname, args or nil)
+-- Runs a sub event that is inside of another event
+-- TODO: check for feature completion
+function Event.startsub(subname, args)
+	local ev = EventList.subevents[subname]
+
+	Event.__setupEvent(ev)
+end
+
+-- TODO: seek and stop/resume all if needed
+function Event.stop(event)
+	event.status = "stopped"
+end
+
+function Event.pause(event)
+	event.status = "suspended"
+end
+
+function Event.resume(event)
+	event.status = "running"
 end
 
 -- TODO: rework to find complete name or event
 -- Destroys an event (searching for part of the name is _maybe_ more effective)
 function Event.destroy(eventname, seekall)
+
+	-- TODO: reduce redundancy
+	-- Seek the first most named event to force end
 	if not (seekall) then
-		-- Seek the first most named event to delete
-		for _,evclass in pairs(Running_Events) do
-			if (string.match(evclass.name, eventname)) then
-				evclass._idletime = 0
-				evclass.status = "dead"
-				Running_Events[evclass] = nil
-				if (Event.printlog) then
-					print(string.format("Event (%s) deleted by event.destroy /!\\", evclass.name))
-				end
+		for _,evclass in pairs(EventList.events) do
+			if (evclass.name == eventname) then
+				Event.__endEvent(evclass)
+				Event.printdebug(string.format("\x81 Event [%s] declared dead by Event.destroy!", evclass.name))
+				return
+			end
+		end
+		for _,evclass in pairs(EventList.subevents) do
+			if (evclass.name == eventname) then
+				Event.__endEvent(evclass)
+				Event.printdebug(string.format("\x81 Event [%s] declared dead by Event.destroy!", evclass.name))
+				return
 			end
 		end
 	else
 		-- Seek all events named similarly
-		for _,evclass in pairs(Running_Events) do
-			(function()
-				if (string.match(evclass.name, eventname)) then
-					evclass._idletime = 0 -- TODO: should be .index?
-					evclass.status = "dead"
-					Running_Events[evclass] = nil
-					if (Event.printlog) then
-						print(string.format("Event (%s) deleted by event.destroy /!\\", evclass.name))
-					end
-					return
-				end
-
-			end)()
+		--[[for _,evclass in pairs(EventList.events) do
+			if (string.match(evclass.name, eventname)) then
+				Event.__endEvent(evclass)
+				Event.printdebug(string.format("Event [%s] declared dead by Event.destroy /!\\", evclass.name))
+			end
 		end
-	end
+		for _,evclass in pairs(EventList.subevents) do
+			if (string.match(evclass.name, eventname) then
+				Event.__endEvent(evclass)
+				Event.printdebug(string.format("Event [%s] declared dead by Event.destroy /!\\", evclass.name))
+			end
+		end--]]
+	end	
 end
 
 -- Destroys a group of states all in one go
@@ -145,59 +228,30 @@ function Event.destroygroup(eventnamelist, seekall)
 	end
 end
 
--- Transfers all of the variables from the source event
--- will work with other objects, but best used to reference another event
-function Event.transfercontent(indexsource, indextdest)
-	-- Surf through the source index table for content
-	for k,v in pairs(indexsource._copy) do
-		(function()
-			if (k == "_idletime"
-			or k == "_looptrack"
-			or k == "_self"
-			or k == "_copy") then
-			--or k == "_user") then
-				return 
-			end
-			indexsource[k] = v
-			--print(k,v)
-		end)()
-	end
-	-- erase the current event user after inserting
-	indexsource._copy = nil
-end
-
--- Returns the 'user' of the state
-function Event.getuser(eventsource)
-	return eventsource._user
-end
-
--- Get the current tag/step number of the scope this is called in
-function Event.gettag(event, stepnum)
-	return event._self.step
+-- Get the current state number number of the scope this is called in
+function Event.getcurrentstate(event, stepnum)
+	return event.step
 end
 
 -- Sets a tag inside of the state
 function Event.settag(event, tagname)
-	event._self.tags[tagname] = event._self.step
+	event.tags[tagname] = event.step
 	
-	if (Event.printlog) then
-		print(string.format("Set tag id %d on tag[%s]", event._self.step, tagname))
-	end
+	Event.printdebug(string.format("Set tag id %d on tag[%s]", event.step, tagname))
 	
-	return event._self.step
+	return event.step
 end
+
+-- function Event.removetag(event, tagname)
+-- 	event.tags[tagname] = nil
+-- 	Event.printdebug(string.format("Removed tag[%s].", tagname))
+-- end
 
 -- Go to the tag number given in the current state
 function Event.gototag(event, tagname)
-	event._self.step = event._self.tags[tagname]-1
+	event.step = event.tags[tagname]-1
 
-	if (Event.printlog) then
-		print(string.format("Going to tag id %d on tag[%s]", event._self.step+1, tagname))
-	end
-end
-
-function Event.rewindtag(event, tagname)
-	Event.gototag(event, tagname)
+	Event.printdebug(string.format("Going to tag id %d on tag[%s]", event.step+1, tagname))
 end
 
 -- Go to a tag number if a condition is reached
@@ -209,45 +263,49 @@ function Event.gototaguntil(event, tagname, cond)
 	end
 end
 
--- TODO: seek and stop/resume all if needed
-function Event.stop(event)
-	event._self.status = "stopped"
-end
-
-function Event.pause(event)
-	event._self.status = "suspended"
-end
-
-function Event.resume(event)
-	event._self.status = "running"
-end
+-- Aliases for these while keeping the old for backwards compatability
+Event.setloop = Event.settag
+Event.gotoloop = Event.gototag
+Event.loopuntil = Event.gototaguntil
 
 
 -- Forces an event to wait until a set time
 local function wait(event, time)
 
-	-- sleep time is over
-	if event._idletime <= 1 then event._self.status = "resumed" end
+	--[[-- sleep time is over
+	if event.sleeptime <= 1 then event.status = "resumed" end
 
-	if not (event._idletime) then
+	if not (event.sleeptime) then
 		-- Set time and suspended status
-		event._self.status = "suspended"
-		event._idletime = time+1
+		event.status = "suspended"
+		event.sleeptime = time+1
 		
-		if (Event.printlog) then
-			print(event._self.name.." is now waiting")
-		end
+		Event.printdebug(string.format("[%s] is now waiting.", event.name))
 	else
-		event._idletime = max(0, $1-1)
+		event.sleeptime = max(0, $1-1)
+	end--]]
+	
+	-- Set time and suspended status
+	if (event.sleeptime == 0 and not (event.status == "suspended")) then
+		event.sleeptime = time
+		event.status = "suspended"
+		Event.printdebug(string.format("[%s] is now waiting. (%d)", event.name, time))
+	end
+
+	-- Count down
+	if (event.sleeptime > 0) then
+		event.sleeptime = max(0, $1-1)
+	else
+		event.status = "resumed"
 	end
 end
 
 -- Waits until the condition is true, then unsuspend the event (with callback at end)
 local function waitUntil(event, cond, end_func)
 	if not (cond) then
-		event._self.status = "suspended"
+		event.status = "suspended"
 	else
-		event._self.status = "resumed"
+		event.status = "resumed"
 
 		-- Run a callback function when the condition is reached if specified
 		if (end_func) then
@@ -259,35 +317,29 @@ end
 -- Pauses the entire state until its signal is responded to
 -- (attempted rewrite without waiting_on_signal)
 local function waitSignal(event, signalname)
-	if (event._self.signal == "") then
-		-- TODO: should this be a check in the thinker or is it fine here?, 
-		-- it should achieve the same result
-		event._self.status = "suspended"
-		event._self.signal = signalname
-	elseif (event._self.signal == "__" .. signalname .. "_gotsignal") then
-		event._self.status = "resumed"
-		event._self.signal = ""
+	if (event.signal == "") then
+		event.status = "suspended"
+		event.signal = signalname
+		Event.printdebug(string.format("[%s]: Seeking signal '%s'...", event.name, signalname))
+	elseif (event.signal == signalname .. "_resp") then
+		event.status = "resumed"
+		event.signal = ""
 	end
 end
 
 -- Activates a signal
-local function signal(signalname)
+local function signal(signalname, issubevent)
+	
 	-- Seek all signals named similarly
-	for _,evclass in pairs(Running_Events) do
-		(function()
-			-- Find a match, then clear + resume (warning: matches partial)
-			if (string.match(tostring(evclass.signal), signalname)) then
+	Event.searchtable(function(i, evclass)
+		if (string.match(evclass.signal, signalname)) then
 
-				-- TODO: ..get a better response name
-				evclass.signal = "__".. $1 .."_gotsignal"
+			evclass.signal = $1 .."_resp"
 
-				if (Event.printlog) then
-					print(string.format("Signal match (%s) and response: FESM should progress. (*)", signalname))
-				end
-				return
-			end
-		end)()
-	end
+			Event.printdebug(string.format("Signal '%s' found! Continuing...", signalname))
+			return
+		end
+	end, issubevent)
 end
 
 -- function Event.for(start, max, skip, func)
@@ -300,33 +352,29 @@ end
 -- (for multiple, use doOrder instead)
 rawset(_G, "doOnce", function(event, func)
 	-- Run once when looptracker is under 1 (thanks for this)
-	if event._looptrack < 1 then
+	if event.looptrack < 1 then
 		
 		func()
 
-		if (Event.printlog) then
-			print("doOnce has been launched.")
-		end
+		Event.printdebug("doOnce has been launched.")
 	end
-	event._looptrack = $1+1
+	event.looptrack = $1+1
 end)
 
 -- Waits until the condition is true, then unsuspend the event (wrapper ver.)
 rawset(_G, "doUntil", function(event, cond, while_func, end_func)
 	if not (cond) then
 		while_func()
-		event._self.status = "suspended"
+		event.status = "suspended"
 	else
-		event._self.status = "resumed"
+		event.status = "resumed"
 
 		-- Run a callback function when the condition is reached if specified
 		if (end_func) then
 			end_func()
 		end
 
-		if (Event.printlog) then
-			print("doUntil has ended.")
-		end
+		Event.printdebug("doUntil has ended.")
 	end
 end)
 
@@ -335,109 +383,122 @@ rawset(_G, "doOrder", function(event, funclist)
 
 	-- Increase loop tracker until the end of the list
 	-- TODO: ordertype such as loop, anim(ation), or multi?
-	if (event._looptrack < #funclist) then
-		event._looptrack = $1+1	
-		event._self.status = "suspended"
+	if (event.looptrack < #funclist) then
+		event.looptrack = $1+1	
+		event.status = "suspended"
 	end
 
 	-- Run the function type in the list
-	if type(funclist[event._looptrack]) == "function" then
-		do funclist[event._looptrack]() end
+	if type(funclist[event.looptrack]) == "function" then
+		do funclist[event.looptrack]() end
 	end
 
 end)
 
+-- This function progresses the state inside the event forward
+local function EventStateProgressor(e)
 
--- Handles running events similar to coroutines
-local function RunEvents(event)
-	-- TODO use ipairs
-	for key,evclass in pairs(Running_Events) do
-		
-		-- The status is dead, remove
-		if (evclass.status == "dead") then
-			Running_Events[key] = nil
+	-- Do not run if the status is normal or dead. Continue next iteration if so.
+	if not (e.status == "normal" or e.status == "dead") then
+
+		-- Set events to dead once they reach the end of the list
+		if (e.step > #e.states) then
+			e.status = "dead"
+			return
 		end
 
-		-- Do not run if the status is normal or dead. Continue next iteration if so.
-		(function()
-			if not (evclass.status == "normal" or evclass.status == "dead") then
+		-- Print some useful info to the log when enabled
+		-- Event.printdebug(string.format("%d/%d %s[%s%s] - [w%d] [lt%d] [Action]:", e.step, #e.states, e.name, e.status, "|"..e.signal, e.sleeptime, e.looptrack))
 
-				-- Set events to dead once they reach the end of the list
-				if (evclass.step > #evclass.events) then
-					evclass.status = "dead"
-					return
-				end
+		-- the _entire_ state is stopped, nothing runs
+		if e.status == "stopped" then return end
 
-				-- Print some useful info to the log when enabled
-				if (Event.printlog) then
-					print(string.format("%d/%d %s[%s%s] - [w%d] [lt%d] [Action]:", evclass.step, #evclass.events, evclass.name, evclass.status, "|"..evclass.signal, evclass.index._idletime, evclass.index._looptrack))
-				end
+		-- TODO: what if suspended, and we want the step function to run only once?
+		do e.states[e.step]() end -- Run functions (:
 
-				-- the _entire_ state is stopped, nothing runs
-				if evclass.status == "stopped" then return end
+		-- the event is waiting/yielded
+		if e.status == "suspended" then return end
 
-				-- TODO: what if suspended, and we want the step function to run only once?
-				do evclass.events[evclass.step]() end -- Run functions (:
+		-- Progress the step of the list
+		e.step = $1+1
+		e.looptrack = 0
 
-				-- the event is waiting/yielded
-				if evclass.status == "suspended" then return end
+	end
+end
 
-				-- Progress the step of the list
-				evclass.step = $1+1
-				evclass.index._looptrack = 0
+-- Handles running events similar to coroutines, but only when they are activated
+function Event.RunEvents(event)
 
-			end
-		end)()
+	for key,evclass in pairs(EventList.events) do
+		
+		-- TODO: what do we do now if we aren't actually deleting tables anymore?
+		-- The status is dead, remove
+		-- if (evclass.status == "dead") then
+		-- 	-- EventList[key] = nil
+		-- end
+
+		EventStateProgressor(evclass)
+
+		-- (function()
+		-- end)()
+
+	end
+	for key,evclass in pairs(EventList.subevents) do
+		EventStateProgressor(evclass)
 	end
 end
 
 
+
+
+
+
+-- =====================
 -- Hooks
+-- =====================
+--[[
+This is the structure of each container with fields we allow to be accessed:
+Events 1: 
+{
+	name: {name, status, step, signal, tags, sleeptime, looptrack, vars{}, states{...}},
+	...
+}
 
--- The structure of each state machine should be:
--- Saved 1: 
--- {
--- 	name: {name, status, step, signal, index{}, funcs{...}},
--- ...
--- }
+SubEvents 2:
+{
+	name: {name, status, step, signal, tags, sleeptime, looptrack, states{...}},
+	...
+}
 
--- Running 2:
--- {
--- 	{name, status, step, signal, index{}, funcs{...}},
--- 	...
--- }
+Vars:
+{_user, _copy, ...}
+--]]
 
--- Index:
--- {_user, _copy, _idletime, _looptrack, _self, ...}
-
--- To Avoid errors, hooks should modify based on each table mapping
-
--- TODO: when netvars eventually works
+-- Syncs table data over netplay so players are not de-synced on join
 addHook("NetVars", function(network)
 
-	--[[for key,obj in pairs(Running_Events) do
-		obj.name = net($)
-		obj.status = net($)
-		obj.step = net($)
-		obj.signal = net($)
-		obj.index = {
-			_user = net($),
-			_copy = net($),
-			_idle = net($),
-			_looptrack = net($),
-			_self = {
-			},
-		}
-	end--]]
+	for key,obj in pairs(EventList.events) do
+		obj.name = network($)
+		obj.status = network($)
+		obj.step = network($)
+		obj.signal = network($)
+		obj.tags = network($)
+		obj.sleeptime = network($)
+		obj.looptrack = network($)
+		obj.vars = network($)
+	end
 
-	--[[for object,val in pairs(EventList) do
-		if not (type(val) == "function") then
-			object[val] = net($)
-		end
-	end--]]
+	for key,obj in pairs(EventList.subevents) do
+		obj.name = network($)
+		obj.status = network($)
+		obj.step = network($)
+		obj.signal = network($)
+		obj.tags = network($)
+		obj.sleeptime = network($)
+		obj.looptrack = network($)
+		-- obj.vars = network($)
+	end
 
-	--[[Running_Events = net(Running_Events)
-	EventList = net(EventList)--]]
 end)
 
 
@@ -452,27 +513,30 @@ addHook("MapLoad", function(gamemap)
 	end
 
 	-- Run a 'global' event
-	-- TODO: stated far above, but thinking about it further- if globals are
-	-- just started every time with the same exact content, does it matter
-	-- if we don't deepcopy?
  	if (mapheaderinfo[gamemap].globalevent) then
 		Event.start(mapheaderinfo[gamemap].globalevent:gsub("%z", ""), {user = server})
 	end
 end)
 
 -- Destroy all events on map change (TODO: unless specified?)
-addHook("MapChange", function()
-
-	-- TODO: move to separate function (?)
-	for key,evclass in pairs(Running_Events) do
-		Running_Events[key] = nil
-		-- evclass.status = "dead"
-		-- evclass = nil
+function Event.MapReloadResetEvents()
+	-- TODO: if an event does not want to be reset, exclude it
+	for k,object in pairs(EventList.events) do
+		Event.__resetEvent(object)
 	end
-	Running_Events = {}
+	for k,object in pairs(EventList.subevents) do
+		Event.__resetEvent(object)
+	end
+end
+
+addHook("MapChange", function()
+	Event.MapReloadResetEvents()
+end)
+addHook("MapLoad", function()
+	Event.MapReloadResetEvents()
 end)
 
-addHook("ThinkFrame", RunEvents)
+addHook("ThinkFrame", Event.RunEvents)
 
 -- Globals
 rawset(_G, "wait", wait)
