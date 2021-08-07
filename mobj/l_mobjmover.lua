@@ -80,6 +80,10 @@ function MobjMover.ismoving(n)
 	return MobjMover.seek(n)
 end
 
+function MobjMover.waitmovedone(event, n)
+	if not _G["Event"] then print("Event script is not loaded!") return end
+	if (MobjMover.ismoving(n)) then Event.pause(event) else Event.resume(event) end
+end
 
 function MobjMover.Thinker()
 
