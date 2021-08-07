@@ -12,7 +12,7 @@
 
 ]]
 
-rawset(_G, "Event", {debug=true})
+rawset(_G, "Event", {debug=false})
 rawset(_G, "EVE", Event)
 
 
@@ -237,7 +237,7 @@ end
 function Event.settag(event, tagname)
 	event.tags[tagname] = event.step
 	
-	Event.printdebug(string.format("Set tag id %d on tag[%s]", event.step, tagname))
+	Event.printdebug(string.format("\x82 -------[%s]: Set loop at Step %d-------", tagname, event.step))
 	
 	return event.step
 end
@@ -249,9 +249,10 @@ end
 
 -- Go to the tag number given in the current state
 function Event.gototag(event, tagname)
-	event.step = event.tags[tagname]-1
+	event.step = event.tags[tagname]
+	event.status = "looped"
 
-	Event.printdebug(string.format("Going to tag id %d on tag[%s]", event.step+1, tagname))
+	Event.printdebug(string.format("\x82 -------[%s]: Returning to Step %d-------", tagname, event.tags[tagname]))
 end
 
 -- Go to a tag number if a condition is reached
@@ -266,7 +267,7 @@ end
 -- Aliases for these while keeping the old for backwards compatability
 Event.setloop = Event.settag
 Event.gotoloop = Event.gototag
-Event.loopuntil = Event.gototaguntil
+Event.gotoloopuntil = Event.gototaguntil
 
 
 -- Forces an event to wait until a set time
@@ -418,6 +419,9 @@ local function EventStateProgressor(e)
 
 		-- the event is waiting/yielded
 		if e.status == "suspended" then return end
+
+		-- the event has looped backwards, and replaying itself
+		if e.status == "looped" then e.status = "running" return end
 
 		-- Progress the step of the list
 		e.step = $1+1
