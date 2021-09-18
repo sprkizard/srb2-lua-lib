@@ -33,9 +33,11 @@ function FrameAnim.add(animname, animator, nsprite, startf, endf, args)
 		sprite=nsprite,
 		startframe=R_Char2Frame(startf), --startf,
 		endframe=R_Char2Frame(endf), --endf,
-		loop=(args and args.loop) or R_Char2Frame(endf)*((args and args.delay) or 1), -- if no loop, set to end frame (ef*delay for slower animations)
+		loop=(args and args.loop) or ((R_Char2Frame(endf)-R_Char2Frame(startf)) * ((args and args.delay) or 1)), -- if no loop, set to end frame (ef*delay for slower animations)
 		frameskip=(args and args.frameskip) or 1, -- TODO: implement frameskip
 		delay=(args and args.delay) or 1,
+		flag=(args and args.flag) or 0, -- TODO: sprite flag that applies to separate frames. currently does not work.
+		-- spritelist = {}, -- TODO: separate flags per frame?
 		paused=false,
 		deleted=false,
 	})
@@ -77,7 +79,7 @@ function FrameAnim.checkexisting(animname)
 end
 
 -- Suspends an event until the animation ends
-function FrameAnim.suspend_finished(event, animname)
+function FrameAnim.waitframedone(event, animname)
 	if not _G["Event"] then print("Event script is not loaded!") return end
 	if (FrameAnim.checkexisting(animname)) then Event.pause(event) else Event.resume(event) end
 end
@@ -112,7 +114,7 @@ addHook("ThinkFrame", function()
 
 					-- Play the sprite's frames by set speed and delay
 					if (leveltime % anim.delay == 0) then
-						anim.mobj.frame = $1+1 * anim.frameskip
+						anim.mobj.frame = ($1+1 * anim.frameskip)|anim.flag
 					end
 
 					-- Reset the framecount to the beginning
@@ -151,6 +153,34 @@ addHook("ThinkFrame", function()
 
 end)
 
+addHook("NetVars", function(network)
+	
+	for _,object in ipairs(FrameAnim.playing) do
+
+		object.name = network($)
+		object.mobj = network($)
+		object.sprite = network($)
+		object.startframe = network($)
+		object.endframe = network($)
+		object.loop = network($)
+		object.frameskip = network($)
+		object.delay = network($)
+		object.flag = network($)
+		-- object.spritelist = network($)
+		object.paused = network($)
+		object.deleted = network($)
+	end
+
+	--[[local a = #FrameAnim.playing
+	a = network(a)
+	for i = 1, a do
+		FrameAnim.playing[i] = network($)
+	end--]]
+
+end)
+
+
+
 -- Uncomment for Example
 --[[addHook("ThinkFrame", function()
 
@@ -162,7 +192,7 @@ end)
 		-- FrameAnim.add("name", s, SPR_EGGM, A, F)
 		-- FrameAnim.add("name", s, SPR_EGGM, V, W, {loop=2*TICRATE})
 		-- FrameAnim.add("name", s, SPR_PIKE, A, P)
-		FrameAnim.add("name", s, SPR_GFZD, 0, 31, {loop=10*TICRATE})
+		FrameAnim.add("name", s, SPR_GFZD, R_Frame2Char(0), R_Frame2Char(31), {loop=10*TICRATE})
 	end
 
 	if leveltime == 7*TICRATE then 
@@ -175,6 +205,7 @@ end)
 
 	if leveltime == 8*TICRATE then
 		local s = P_SpawnMobj(-64*FU, -96*FU, 64*FU, MT_PULL)
-		FrameAnim.add("existing", s, SPR_EGGM, V, W, {loop=8*TICRATE, delay=15})
+		FrameAnim.add("existing", s, SPR_EGGM, "V", "W", {loop=8*TICRATE, delay=15})
 	end
-end)--]]
+end)
+--]]
