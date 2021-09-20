@@ -12,6 +12,8 @@
 
 ]]
 
+-- TODO: remove deleteme labeled pieces of code when proven to be 70% stable
+
 rawset(_G, "Event", {debug=false})
 rawset(_G, "EVE", Event)
 
@@ -81,8 +83,8 @@ if (Event.debug) then
 	hud.add(function(v,stplyr,cam)
 		local x = 0
 		local y = 0
+		v.drawString(0,55, string.upper("\x81Running Events: ")..#Running_Events, 0, "small-thin")
 		Event.searchtable(function(i, ev)
-			v.drawString(0,55, string.upper("\x81Running Events:"), 0, "small-thin")
 			v.drawString(0+x,64+y, string.format("Event: %s\nState: %d/%d\nStatus: %s\nSignal: %s\nIdle: %d", ev.name, ev.step, #ev.states, ev.status, ev.signal, ev.sleeptime), 0, "small-thin")
 			x = $1+64
 			if (i % 4 == 0) then
@@ -196,7 +198,7 @@ function Event.start(eventname, args, caller)
 
 	-- Instead of breaking the entire script with a Lua error, just don't play it and print a warning instead
 	if not EventList[eventname] then
-		print(string.format("\x81 Event [%s] does not exist!", eventname))
+		print(string.format("(?)\x81 Event [%s] does not exist!", eventname))
 		return
 	end
 
@@ -253,15 +255,17 @@ function Event.destroy(eventname, seekall)
 	-- TODO: reduce redundancy
 	-- Seek the first most named event to force end
 	if not (seekall) then
-		for _,evclass in pairs(Running_Events) do
-			if (evclass.name == eventname) then
-				Event.__endEvent(evclass)
-				Event.printdebug(string.format("\x81 Event [%s] was ended early by Event.destroy!", evclass.name))
+		Event.searchtable(function(i, ev)
+			if (ev.name == eventname) then
+				Event.__endEvent(ev)
+				Running_Events[ev] = nil
+				Event.printdebug(string.format("(!)\x81 ALERT: Event [%s] was ended early by Event.destroy!", ev.name))
 				return
 			end
-		end
-	else
-		-- TODO: deleteme
+		end)
+	end
+	-- TODO: deleteme
+	--else
 		-- Seek all events named similarly
 		--[[for _,evclass in pairs(EventList.events) do
 			if (string.match(evclass.name, eventname)) then
@@ -275,7 +279,7 @@ function Event.destroy(eventname, seekall)
 				Event.printdebug(string.format("Event [%s] declared dead by Event.destroy /!\\", evclass.name))
 			end
 		end--]]
-	end	
+	--end	
 end
 
 -- Destroys a group of states all in one go
@@ -283,6 +287,11 @@ function Event.destroygroup(eventnamelist, seekall)
 	for i=1,#eventnamelist do
 		Event.destroy(eventnamelist[i], seekall)
 	end
+end
+
+-- Sets an event to be persistent between map changes
+function Event.persist(event, arg)
+	event.persist = arg
 end
 
 -- Get the current state number number of the scope this is called in
@@ -571,10 +580,32 @@ addHook("NetVars", function(network)
 
 end)
 
+-- Destroy all events on map change
+function Event.MapReloadClearEvents()
+	-- if an event does not want to be reset or ended, exclude it
+	Event.searchtable(function(i, ev)
+		if ev and ev.persist then return end
+		Event.__endEvent(ev)
+	end)
+
+	-- TODO: deleteme
+	--[[for k,object in pairs(Running_Events) do
+		if not object.persist then 
+		Event.__endEvent(object)
+	end--]]
+	--[[for k,object in pairs(EventList.events) do
+		Event.__resetEvent(object)
+	end
+	for k,object in pairs(EventList.subevents) do
+		Event.__resetEvent(object)
+	end--]]
+end
 
 -- When specified, run an event by name on map load, and do other kinds of stuff
 addHook("MapLoad", function(gamemap)
 	
+	Event.MapReloadClearEvents()
+
 	-- Run an event on map load per player
 	if (mapheaderinfo[gamemap].loadevent) then
 		for player in players.iterate do
@@ -588,25 +619,7 @@ addHook("MapLoad", function(gamemap)
 	end
 end)
 
--- Destroy all events on map change (TODO: unless specified?)
-function Event.MapReloadClearEvents()
-	-- TODO: if an event does not want to be reset, exclude it
-	for k,object in pairs(Running_Events) do
-		Event.__endEvent(object)
-	end
-
-	--[[for k,object in pairs(EventList.events) do
-		Event.__resetEvent(object)
-	end
-	for k,object in pairs(EventList.subevents) do
-		Event.__resetEvent(object)
-	end--]]
-end
-
 addHook("MapChange", function()
-	Event.MapReloadClearEvents()
-end)
-addHook("MapLoad", function()
 	Event.MapReloadClearEvents()
 end)
 
