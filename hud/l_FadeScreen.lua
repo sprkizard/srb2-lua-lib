@@ -29,7 +29,9 @@ if _G["R_ScreenFade"] then return end
         v.fadeScreen(color, dt%33)
     end)
 
-end--]]
+end
+rawset(_G, "fadescreen", fadescreen)
+--]]
 
 
 -- New Version
@@ -108,5 +110,4 @@ function(args, v, stplyr)
     end
 end)
 
-rawset(_G, "fadescreen", fadescreen)
 rawset(_G, "R_ScreenFade", R_ScreenFade)
