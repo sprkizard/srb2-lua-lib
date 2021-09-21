@@ -2,7 +2,7 @@
 if _G["R_ScreenFade"] then return end
 
 -- Legacy Version
-local function fadescreen(direction, color, speed, timescale, dontdraw)
+--[[local function fadescreen(direction, color, speed, timescale, dontdraw)
 
     local dt = 0 -- time
     local dts = timescale or 1 -- timescale
@@ -29,61 +29,84 @@ local function fadescreen(direction, color, speed, timescale, dontdraw)
         v.fadeScreen(color, dt%33)
     end)
 
-end
+end--]]
 
 
--- New Version (tables are a little safer in the event we change entire arguments...)
+-- New Version
 local function R_ScreenFade(ftype, args)
 
     -- Requires: l_hudzordering.lua
-    if not _G["R_AddHud"] then print("This R_ScreenFade requires l_hudzordering.lua to work!") return end
-
-    local time = 0 -- elapsed time value
-    local delay = args and args.delay or 1 -- TODO: merge speed and delay?
-    local speed = args and args.speed or 1 -- speed
-    local color = args and args.color or 0 -- color
+    if not _G["R_AddHud"] then print("(!)\x82 R_ScreenFade requires l_hudzordering.lua to work!") return end
     
-    -- Allow the user to access the built in fadetypes with a phrase
-    if (color == "type1") then
-        color = 0xFF00
-    elseif (color == "type2") then
-        color = 0xFA00
-    elseif (color == "type3") then
-        color = 0xFB00
+    -- Allow the user to relocate the layer the fade is on
+    local layer = (args and args.layer or 256)
+
+    local a = {}
+    a.fadetype = ftype -- The fading type (in, out, full, clear)
+    a.time = 0 -- Elapsed Time
+    a.delay = (args and args.delay or 1) -- Delay of the fade TODO: merge speed and delay?
+    -- a.speed = (args and args.speed or 1) -- Speed of the fade (Unused)
+
+    -- Allow the user to access the built in fadetypes with an alias
+    local colortypes = {
+        type1 = 0xFF00,
+        -- value1 = 0xFF00,
+        type2 = 0xFA00,
+        -- value2 = 0xFA00,
+        type3 = 0xFB00,
+        -- value3 = 0xFB00,
+    }
+    for k,v in pairs(colortypes) do
+        if (args and args.color == k) then
+            a.color = v
+            break
+        else
+            a.color = (args and args.color or 0) -- color
+        end
     end
 
-    -- Maxstrength between palette and special values
-    local maxstrength = ((args and (color == 0xFF00 or color == 0xFA00 or color == 0xFB00)) and 32 or 10)
+    -- Determine the max strength between palette and special values
+    a.maxstrength = ((args and (a.color == 0xFF00 or a.color == 0xFA00 or a.color == 0xFB00)) and 32 or 10)
 
     -- Inverse the time if a fade-in
-    if (ftype == "in") then time = maxstrength end
+    if (ftype == "in") then a.time = a.maxstrength end
 
-    -- Send new overwritable hudlayer entry (full, clear, or default)
-    if (ftype == "full") then
-         R_AddHud("_screenfade", 99, function(v, stplyr)
-            v.fadeScreen(color, maxstrength)
-        end)
-        return
-    elseif (ftype == "clear")
-        R_DeleteHud("_screenfade")
-        return
-    else
-        R_AddHud("_screenfade", 99, function(v, stplyr)
-
-            if (leveltime % delay == 0) then
-                if (ftype == "out") then
-                    time = min(maxstrength, $+1 * 1)
-                elseif (ftype == "in") then
-                    time = max(0, $-1 * 1)
-                else
-                    return
-                end
-            end
-            -- Only one fadescreen needed outside the if here
-            v.fadeScreen(color, time)
-        end)
-    end
+    -- Set the Hud attributes 
+    R_SetHud("__vfadeScreen", layer, a)
+    -- print(string.format("time:%d | type: %s | strn: %s", a.time, a.fadetype, a.maxstrength))
 end
+
+-- Custom Hud Entry
+R_AddHud("__vfadeScreen", nil, 
+{
+    fadetype = "in",
+    time = 0,
+    delay = 1,
+    -- speed = 1,
+    color = 0,
+    maxstrength = 10,
+},
+function(args, v, stplyr)
+
+    -- Handle the hud entry options (full, clear, or default)
+    if (args.fadetype == "full") then
+        v.fadeScreen(args.color, args.maxstrength)
+    elseif (args.fadetype == "clear")
+        R_DeleteHud("__vfadeScreen")
+    else
+        if (leveltime % args.delay == 0) and not paused then
+            if (args.fadetype == "out") then
+                args.time = min(args.maxstrength, $+1 * 1)
+            elseif (args.fadetype == "in") then
+                args.time = max(0, $-1 * 1)
+            else
+                return
+            end
+        end
+        -- Only one fadescreen needed here
+        v.fadeScreen(args.color, args.time)
+    end
+end)
 
 rawset(_G, "fadescreen", fadescreen)
 rawset(_G, "R_ScreenFade", R_ScreenFade)
