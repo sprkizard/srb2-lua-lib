@@ -2,19 +2,19 @@
 rawset(_G, "Fontlib", {})
 
 Fontlib.fontinfo = {
-	["STCFN"] = {width=8},
-	["TNYFN"] = {width=5},
-	["LTFNT"] = {width=20},
-	["TTL"] = {width=29},
-	["CRFNT"] = {width=16},
-	["NTFNT"] = {width=16},
-	["NTFNO"] = {width=20},
+	["STCFN"] = {},
+	["TNYFN"] = {},
+	["LTFNT"] = {},
+	["TTL"] = {},
+	["CRFNT"] = {upperonly=true},
+	["NTFNT"] = {upperonly=true},
+	["NTFNO"] = {},
 }
 
 -- Returns the width what the string as patches would be,
 -- and returns all cached patches in a table
 -- function Fontlib.GetInternalFontWidth(str, font)
-function Fontlib.cachePatchWidth(v, str, font)
+function Fontlib.cachePatchWidth(v, str, font, space)
 
 	-- No string
 	if not (str) then return 0 end
@@ -24,7 +24,8 @@ function Fontlib.cachePatchWidth(v, str, font)
 
 	for i=1,#str do
 
-		local char = str:sub(i)
+		local char = str:sub(i,i)
+
 		-- Spaces before fonts
 		if char:byte() == 32 then
 			width = $1+4
@@ -40,56 +41,42 @@ function Fontlib.cachePatchWidth(v, str, font)
 			continue
 		end
 
+		-- TODO: some patches do not exist, and the fix below may not be enough
+		if not (v.patchExists(string.format("%s%03d", font, char:byte()))) then patches[char:byte()] = nil continue end
+		
 		-- Cache patches assigned by byte number
 		-- TODO: some fonts have different byte offsets and digit amounts in names
-		-- if not (patches[char:byte()]) then
+		if not (patches[char:byte()]) then
 			-- Avoid caching the same character twice
 			patches[char:byte()] = v.cachePatch( string.format("%s%03d", font, char:byte()) )
-		-- end
-		width = $1 + patches[char:byte()].width
+		end
+		width = $1 + (patches[char:byte()].width or 8) + space
 
-		-- (Get font width info)
-		-- for fontname, attr in pairs(Fontlib.fontinfo) do
-		-- 	if (font == fontname) then
-		-- 		width = $1 + attr.width
-		-- 		break
-		-- 	end
-		-- end
-
-		--[[for i=1,#Fontlib.fontinfo do
-			if (font == Fontlib.fontinfo[i].font) then
-				width = $1 + Fontlib.fontinfo[i].width
-				break
-			end
-		end--]]
-
-		-- if (font == "STCFN") then -- default font
-		-- 	width = $1+8
-		-- elseif (font == "TNYFN") then
-		-- 	width = $1+7
-		-- elseif (font == "LTFNT") then
-		-- 	width = $1+20
-		-- elseif (font == "TTL") then
-		-- 	width = $1+29
-		-- elseif (font == "CRFNT" or font == "NTFNT") then -- TODO: Credit font centers wrongly
-		-- 	width = $1+16
-		-- elseif (font == "NTFNO") then
-		-- 	width = $1+20
-		-- else
-		-- 	width = $1+8
-		-- end
 	end
-	return {patches=patches, width=width}
+	return {patches=patches, linewidth=width}
+end
+
+function Fontlib.invalidCharPatch(patchlist, char)
+	return patchlist[char:byte()] == nil and true or false
 end
 
 function Fontlib.drawString(v, sx, sy, text, flags, align)
 
+	-- Constants
+	local spacewidth = 4
+
 	-- Scale adjustments
 	local scale = (flags and flags.scale) or FRACUNIT
-
-	-- Text Font
+	local hscale = (flags and flags.hscale) or 0
+	local vscale = (flags and flags.vscale) or 0
+	
+	-- Spacing
+	local xspace = (flags and flags.xspace) or 0 -- TODO: inconsistent width problem again
+	local yspace = (flags and flags.yspace) or spacewidth
+	
+	-- Font Options
 	local font = (flags and flags.font) or "STCFN"
-
+	-- local uppercs = (flags and flags.upper) or false -- TODO: broken
 
 
 	-- Split our string into new lines from line-breaks
@@ -107,7 +94,6 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 		-- Screen x and y positions
 		local x = sx
 		local y = sy
-		local width = 0
 
 		-- Current character & font patch (hopeful optimization)
 		local char
@@ -119,59 +105,60 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 			y = $1 << FRACBITS
 		end
 
-		-- local patches = {}
-		-- for pos=1,#line do
-		-- 	char = line:sub(pos, pos)
-		-- 	if not char:byte() or char:byte() == 32 then
-		-- 		return
-		-- 	end
-		-- 	patches[string.byte(char)] = v.cachePatch( string.format("%s%03d", font, string.byte(char)) )
-		-- 	width = $1 + patches[char:byte()].width
-		-- end
-		-- print(Fontlib.cachePatchWidth(v, line, font).width)
-		-- break
-		-- print
-		local patches = Fontlib.cachePatchWidth(v, line, font).patches
-		local width = Fontlib.cachePatchWidth(v, line, font).width
-		-- TODO: not working correctly for CRFNT
+		-- Get used character patches and the width of the line
+		local cache = Fontlib.cachePatchWidth(v, line, font, xspace)
+		-- local cache = Fontlib.cachePatchWidth(v, line, font).patches
+		-- local width = Fontlib.cachePatchWidth(v, line, font).width
+
+		-- Modify widths for spacing adjustments before setting alignment
+		-- if xspace then width = $1+xspace*spacewidth end
+
 		-- Text block alignment settings
 		if (align == "center") then
-			x = $1-FixedMul( width/2, scale) << FRACBITS
-			-- x = $1-FixedMul( (Fontlib.GetInternalFontWidth(line, font)/2), scale) << FRACBITS
+			x = $1-FixedMul( cache.linewidth/2, scale) << FRACBITS
 		elseif (align == "right") then
-			x = $1-FixedMul( width, scale) << FRACBITS
-			-- x = $1-FixedMul( (Fontlib.GetInternalFontWidth(line, font)), scale) << FRACBITS
+			x = $1-FixedMul( cache.linewidth, scale) << FRACBITS
 		end
 
-		v.drawString(320/2, 150+seg*8, "Line Length: "+#line, 0, "thin")
 
-		-- 
+		-- v.drawString(320/2, 150+seg*8, "Line Length: "+#line, 0, "thin")
 		for pos=1,#line do
 			(function()
 
 				-- String sub each character
 				char = line:sub(pos, pos)
 				
+				-- DOES NOTHING FURTHER IF CHARACTER HAS NO PATCH
+				if (Fontlib.invalidCharPatch(cache.patches, char)) then return end
+				-- if (patches[char:byte()]) == nil then return end
+
 				-- Skip and replace spaces
 				if not char:byte() or char:byte() == 32 then
-					x = $1+4*scale
+					x = $1+spacewidth*scale
 					return
 				end
 
-				-- Transform the char to a font patch
-				-- charpatch = v.cachePatch( string.format("%s%03d", font, string.byte(char)) )
+				-- TODO: broken, should be probably be done in caching
+				-- Unavoidable non V_ALLOWLOWERCASE flag toggle (exclude specials above 210)
+				if (Fontlib.fontinfo[font].upperonly) --(font == "CRFNT" or font == "NTFNT"))
+				and not (char:byte() >= 210) then
+					char = tostring(char):upper()
+				end
 
 				-- Draw the current character given
-				v.drawStretched(x, y, 1*FU, 1*FU, patches[char:byte()], 0, color)
+				v.drawStretched(x, y, scale+hscale, scale+vscale, cache.patches[char:byte()], 0, color)
 
 				-- Sets the space between each character using the font's width
-				x = $1 + (0+patches[char:byte()].width)*scale
+				x = $1 + (xspace+cache.patches[char:byte()].width)*scale
 
 			end)()
 		end
+		
+		if (Fontlib.invalidCharPatch(cache.patches, char)) then continue end
+		-- if (patches[char:byte()]) == nil then continue end
 
-		-- Break new lines by spacing and patch width for semi-accurate spacing
-		local linespacing = FixedMul((4+patches[char:byte()].height)*FU, scale)
+		-- Break new lines by spacing and patch height for source-accurate spacing
+		local linespacing = FixedMul( (yspace+cache.patches[char:byte()].height)*FU, scale )
 		sy = $1 + ((flags and flags.fixed) and linespacing or linespacing >> FRACBITS)
 
 	end
@@ -189,7 +176,11 @@ hud.add(function(v, stplyr, cam)
 	-- v.drawString(320/2, 64, "Fontlib\n-Version 2-\nCustom Text Drawer", 0, "left")
 
 	-- Fontlib
-	Fontlib.drawString(v, 320/2, 4, "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n`1234567890-=\n~!@#$%^&*()_+\n[]\\;',./\n{}|:\"<>?", {font="TNYFN"}, "center")
+	Fontlib.drawString(v, 320/2, 4, "Fontlib\nv2\ncentered\nLines", {font="STCFN", scale=FU}, "center")
+	-- Fontlib.drawString(v, 320/2, 4, "aBABcdFefG", {font="NTFNT"}, "center")
+	-- Fontlib.drawString(v, 320/2, 14, "AAAAAAA", {font="NTFNT"}, "center")
+	-- Fontlib.drawString(v, 320/2, 4, "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n`1234567890-=\n~!@#$%^&*()_+\n[]\\;',./\n{}|:\"<>?", {font="NTFNT"}, "center")
+	
 	-- Fontlib.drawString(v, 320/2, 4, "0123456789", {font="TNYFN"}, "center")
 	-- Fontlib.drawString(v, 320/2, 64, string.upper("Fontlib\n-Version 2-\nCustom Text Drawer"), {}, "left")
 	-- Fontlib.drawString(v, 320/2, 4, "Fontlib\nwith\nnewlines\n1000000\n2000000\n3000000", {font="TNYFN"}, "center")
@@ -203,13 +194,3 @@ hud.add(function(v, stplyr, cam)
 end, "game")
 
 
-hud.add(function(v, stplyr, cam)
-	-- v.drawFill(320/2, 0, 1, v.height(), 35)
-
-	-- Vanilla
-	-- v.drawString(320/2, 64, "Fontlib\n-Version 2-\nCustom Text Drawer", 0, "left")
-
-	-- Fontlib
-	-- drawSuperText(v, 320/2, 80, "0123456789", {})
-
-end, "game")
