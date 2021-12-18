@@ -1,3 +1,12 @@
+--[[
+* l_fontlib.lua
+* (sprkizard)
+* (Dec 6, 2021 16:51)
+* Desc: A custom drawstring function that can 
+		use custom font sets
+
+* Usage: TODO
+]]
 
 rawset(_G, "Fontlib", {})
 
@@ -11,12 +20,25 @@ Fontlib.fontinfo = {
 	["NTFNT"] = {upperonly=true},
 	["STCFN"] = {spacewidth=4, returnheight=4},
 	["TNYFN"] = {spacewidth=2, returnheight=5},
-	["TTL"] = {},
 }
+
+-- Creates an entry for custom font info (width between letters, return spacing, etc)
+function Fontlib.setFontAttr(font, t)
+	
+	Fontlib.fontinfo[font] = {}
+	for k,v in pairs(t) do
+		Fontlib.fontinfo[font][k] = v
+	end
+end
 
 -- Checks if the fontinfo entry exists, and gets the supplied attribute of it
 function Fontlib.getFontAttr(font, attr)
-	return (Fontlib.fontinfo[font] and Fontlib.fontinfo[attr])
+	return (Fontlib.fontinfo[font] and Fontlib.fontinfo[font][attr])
+end
+
+-- Wrapper for validating table contents used here, and using them
+function Fontlib.getAttr(t, key, attr)
+	return (t[key] and t[key][attr])
 end
 
 -- Returns the width what the string as patches would be,
@@ -40,12 +62,12 @@ function Fontlib.cachePatchWidth(v, str, font, space)
 			continue
 		end
 		-- Ignore skincolors completely
-		if char:byte() >= 131 and char:byte() <= 198 then
+		if char:byte() >= 131 and char:byte() <= 199 then
 			continue
 		end
 		-- TODO: count special characters?
-		if char:byte() >= 200 then
-			width = $1+8
+		if char:byte() >= 200 and char:byte() <= 203 then
+			-- width = $1+8
 			continue
 		end
 
@@ -74,12 +96,38 @@ end
 -- function Fontlib.stringEffects(x, y, char, time)
 -- end
 
+-- TODO: Find a way to capture embedded flags
+-- (eg. Font swapping with format: t[font..char:byte()] to cache multiple characters))
+--[[function Fontlib.gettextflag()
+	local keypos = 0
+	local ahead = 0
+
+	if keypos and (pos >= keypos and pos <= ahead) then return end
+	if line:sub(pos, pos+5) == "<test:" then
+		
+		keypos = pos
+		ahead = pos+6
+
+		local capture = ""
+
+		for j=ahead, #line do
+			if (line:sub(j, j) == ">") ahead = $1+#capture break end
+			capture = $1 .. line:sub(j, j)
+			-- print(keypos.."|"..str:sub(j, j))
+		end
+		x = capture
+		return
+	end
+end--]]
+
 
 function Fontlib.drawString(v, sx, sy, text, flags, align)
 
 	-- Font Options
 	local font = (flags and flags.font) or "STCFN"
 	local uppercs = (flags and flags.upper) or false
+	local ramp = (flags and flags.ramp) or nil -- Custom rainbow color
+	local marspeed = (flags and flags.marspeed) or 4 -- Rainbow marquee speed
 	local color = nil
 
 	-- Constants
@@ -117,8 +165,11 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 		local off_y = 0
 		local swirl = 0
 		local shake = 0
+		local rainbow = 0
+		local rcolors = ramp or {SKINCOLOR_SALMON,SKINCOLOR_ORANGE,SKINCOLOR_YELLOW,SKINCOLOR_MINT,SKINCOLOR_SKY,SKINCOLOR_PASTEL,SKINCOLOR_BUBBLEGUM}
 
-		-- Current character & font patch (hopeful optimization)
+		-- Current (+backwards) character & font patch (hopeful optimization)
+		local bchar
 		local char
 		local charpatch
 
@@ -153,7 +204,14 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 				char = line:sub(pos, pos)
 
 				-- Text Effects
+				-- TODO: separate text effects
 				-- ========
+				-- Text Effect: Rainbow color
+				if (char:byte() == 199) then
+					color = nil
+					rainbow = leveltime/marspeed + #line
+					return
+				end
 
 				-- Text Effect: Text color (Custom skincolors unsupported, only MAXSKINCOLORS allowed.)
 				if (char:byte() == 130) then
@@ -161,29 +219,34 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 					return
 				elseif (char:byte() >= 131 and char:byte() <= 198) then
 					color = v.getColormap(TC_DEFAULT, char:byte() - 130)
+					rainbow = 0
 					return
 				end
-
-				if (char:byte() == 161) then
+				-- Stop effects
+				if (char:byte() == 200) then
 					swirl = 0
 					shake = 0
 					return
 				end
 
 				-- Text Effect: That one undertale groove effect
-				if (char:byte() == 162) then
+				if (char:byte() == 201) then
 					swirl = leveltime*2
 					shake = 0
 					return
 				end
 
 				-- Text Effect: That one deltarune shake effect
-				if (char:byte() == 163) then
+				if (char:byte() == 202) then
 					shake = (leveltime/1)*(leveltime/1)*3
 					swirl = 0
 					return
 				end
 
+				if (rainbow) then
+					color = v.getColormap(TC_DEFAULT, rcolors[((rainbow-pos) % #rcolors)+1])
+				end
+				
 				if (swirl) then
 					swirl = $1+2
 					off_x = (cos(ANG10*(swirl)))
@@ -191,9 +254,9 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 				end
 
 				if (shake) then
-					shake = ($1+512)*($1+FU)
+					shake = ($1+1)*($1+FU)
 					off_x = (cos(ANG10*shake))
-					shake = ($1+512)*($1+FU)
+					shake = ($1+1)*($1+FU)
 					off_y = (sin(ANG10*shake))
 				end
 				-- ========
@@ -203,6 +266,9 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 					x = $1+spacewidth*scale
 					return
 				end
+
+				-- Weird return spacing fix by getting the previous character
+				bchar = line:sub(pos-1, pos)
 
 				-- If a character has no patch: prevent from drawing
 				if (Fontlib.invalidCharPatch(cache.patches, char)) then return end
@@ -215,11 +281,11 @@ function Fontlib.drawString(v, sx, sy, text, flags, align)
 
 			end)()
 		end
-		
-		if (Fontlib.invalidCharPatch(cache.patches, char)) then continue end
-
+		-- For control code effects, try to get the last character height
+		local cheight = Fontlib.getAttr(cache.patches, char:byte(), "height")
+		local bcheight = Fontlib.getAttr(cache.patches, bchar:byte(), "height")
 		-- Break new lines by spacing and patch height for source-accurate spacing
-		local linespacing = FixedMul( (yspace+cache.patches[char:byte()].height)*FU, scale )
+		local linespacing = FixedMul( (yspace + (cheight or bcheight or 4) )*FU, scale )
 		sy = $1 + ((flags and flags.fixed) and linespacing or linespacing >> FRACBITS)
 
 	end
@@ -229,29 +295,20 @@ end
 
 
 
+-- Example
+--[[hud.add(function(v, stplyr, cam)
 
-hud.add(function(v, stplyr, cam)
-
-	v.drawFill(320/2, 0, 1, v.height(), 35)
+	-- v.drawFill(320/2, 0, 1, v.height(), 35)
 
 	-- Vanilla
-	-- v.drawString(320/2, 64, "Fontlib\n-Version 2-\nCustom Text Drawer", 0, "left")
+	v.drawString(320/2, 0, "Fontlib\n-Version 2-\nCustom Text Drawer", 0, "left")
 
 	-- Fontlib
-	local spc = 12*cos(leveltime*ANG10)/FU
-	Fontlib.drawString(v, 320/2, 4, "CENTER", {font="CRFNT", scale=FU}, "center")
-	-- Fontlib.drawString(v, 320/2, 4, "Credits font", {font="CRFNT", xspace=spc, scale=FU}, "left")
-	-- Fontlib.drawString(v, 320/2, 32, "Credits font", {font="CRFNT", xspace=spc, scale=FU}, "center")
-	-- Fontlib.drawString(v, 320/2, 64, "Credits font", {font="CRFNT", xspace=spc, scale=FU}, "right")
-	-- Fontlib.drawString(v, 320/2, 96, "4000", {font="TTL", xspace=spc, scale=FU}, "center")
-	-- Fontlib.drawString(v, 320/2, 4, "CENTER", {font="CRFNT", scale=FU}, "center")
-	-- Fontlib.drawString(v, 320/2, 32, "RIGHT", {font="CRFNT", scale=FU}, "right")
-	-- Fontlib.drawString(v, 320/2, 64, "CREDITS", {font="CRFNT", scale=FU}, "left")
-	-- Fontlib.drawString(v, 320/2, 49, "SCALE", {font="CRFNT", scale=FU/2}, "left")
-	-- Fontlib.drawString(v, 320/2, 110, "that one title\nfont\ni think", {font="LTFNT", scale=FU}, "center")
-	-- Fontlib.drawString(v, 320/2, 4, "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n`1234567890-=\n~!@#$%^&*()_+\n[]\\;',./\n{}|:\"<>?", {font="NTFNT"}, "center")
-	-- Fontlib.drawString(v, 320/2, 64, "Fontlib\n-Version 2-\nCustom Text Drawer", {}, "left")
+	local text = "\201Fontlib\200\n-Version 2-\n\202Custom Text Drawer\200"
+	Fontlib.drawString(v, 320/2, 32, text, {font="STCFN"}, "center")
+	Fontlib.drawString(v, 320/2, 64, text, {font="CRFNT"}, "center")
+	Fontlib.drawString(v, 320/2, 128, text, {font="LTFNT"}, "center")
 
 end, "game")
-
+--]]
 
