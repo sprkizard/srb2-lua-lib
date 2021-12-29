@@ -35,9 +35,8 @@ local function R_WorldToScreen2(p, cam, target)
 
 	local ss = FixedDiv(160*FU, hdist)
 
-	return {x=sx, y=sy, scale=ss, inview=visible}
+	return {x=sx, y=sy, scale=ss, onscreen=visible}
 end
-
 
 rawset(_G, "R_WorldToScreen2", R_WorldToScreen2)
 
