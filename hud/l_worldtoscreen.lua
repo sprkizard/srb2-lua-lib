@@ -7,10 +7,6 @@
 * Usage: TODO
 ]]
 
-
-local maplines = {}
-
-
 local function R_WorldToScreen2(p, cam, target)
 
 	-- local sx = cam.angle - R_PointToAngle2(p.mo.x, p.mo.y, target.x, target.y)
@@ -43,40 +39,6 @@ local function R_WorldToScreen2(p, cam, target)
 end
 
 
-hud.add(function(v, stplyr, cam)
+rawset(_G, "R_WorldToScreen2", R_WorldToScreen2)
 
 
-	for mobj in mobjs.iterate() do
-		if mobj.type == MT_BLUECRAWLA then
-		-- if mobj.type == MT_TOKEN then
-			local screencoords = R_WorldToScreen2(stplyr, cam, mobj)
-			if screencoords.inview then
-				v.drawString(screencoords.x/FU, screencoords.y/FU, "Text", V_ALLOWLOWERCASE, "thin-center")
-				-- v.drawScaled(screencoords.x, screencoords.y, screencoords.scale+FU*2/3, v.cachePatch("CROSHAI1"), 0)
-			end
-		end
-	end
-
-	-- for i=1,#maplines do
-	-- 	local ln = maplines[i]
-	-- 	local screencoords = R_WorldToScreen2(stplyr, cam, {x=ln.v1.x,y=ln.v1.y,z=ln.frontsector.floorheight})
-	-- 	local screencoords_b = R_WorldToScreen2(stplyr, cam, {x=ln.v1.x,y=ln.v1.y,z=(ln and ln.backsector) and ln.backsector.floorheight or 0})
-
-	-- 	v.drawScaled(screencoords.x, screencoords.y, screencoords.scale+FU*2/3, v.cachePatch("CROSHAI1"), 0)
-	-- 	v.drawScaled(screencoords_b.x, screencoords_b.y, screencoords_b.scale+FU*2/3, v.cachePatch("CROSHAI1"), 0)
-	-- end
-end, "game")
-
-
-addHook("MapLoad", function(g)
-	for line in lines.iterate do
-		table.insert(maplines, line)
-	end
-end)
-
-addHook("ThinkFrame", function()
-
-	for player in players.iterate do
-		-- player.viewrollangle = $1+ANG1
-	end
-end)
