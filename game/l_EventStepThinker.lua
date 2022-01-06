@@ -289,6 +289,11 @@ function Event.destroygroup(eventnamelist, seekall)
 	end
 end
 
+-- Ends the event that this is attached to without finding it
+function Event.destroyself(event)
+	event.status = "dead"
+end
+
 -- Sets an event to be persistent between map changes
 function Event.persist(event, arg)
 	event.persist = arg
