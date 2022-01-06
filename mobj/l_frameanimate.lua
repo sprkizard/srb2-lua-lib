@@ -78,13 +78,33 @@ function FrameAnim.checkexisting(animname)
 	return FrameAnim.seek(animname)
 end
 
--- Suspends an event until the animation ends
-function FrameAnim.waitframedone(event, animname)
-	if not _G["Event"] then print("Event script is not loaded!") return end
-	if (FrameAnim.checkexisting(animname)) then Event.pause(event) else Event.resume(event) end
+-- ================
+-- Event Extension
+-- Checks if a certain script is loaded to extend some of it's features
+function FrameAnim.EventExists()
+	if not _G["Event"] then print("(!)\x82 This function requires 'Event' to work!") return false else return true end
 end
 
-addHook("ThinkFrame", function()
+-- Add a custom wrapper event + others when the companion script exists
+if FrameAnim.EventExists() then
+
+	-- Suspends an event until the animation ends
+	function FrameAnim.waitframedone(event, animname)
+		if (FrameAnim.checkexisting(animname)) then Event.pause(event) else Event.resume(event) end
+	end
+-- else
+-- 	local handler_str = "(!)\x82 Function [FrameAnim.waitframedone] requires 'Event' to work, is it available?"
+	
+-- 	function FrameAnim.waitframedone()
+-- 		print(handler_str)
+-- 	end
+end
+
+-- ================
+
+
+-- The thinker function that handles animations
+function FrameAnim.Thinker()
 
 	for i=1, #FrameAnim.playing do
 		
@@ -151,44 +171,35 @@ addHook("ThinkFrame", function()
 		end)()
 	end
 
-end)
+end
 
-addHook("NetVars", function(network)
-	
-	for _,object in ipairs(FrameAnim.playing) do
-
-		object.name = network($)
-		object.mobj = network($)
-		object.sprite = network($)
-		object.startframe = network($)
-		object.endframe = network($)
-		object.loop = network($)
-		object.frameskip = network($)
-		object.delay = network($)
-		object.flag = network($)
-		-- object.spritelist = network($)
-		object.paused = network($)
-		object.deleted = network($)
-	end
+function FrameAnim.netvars(n)
+	FrameAnim.playing = n($)
 
 	--[[local a = #FrameAnim.playing
-	a = network(a)
+	a = n(a)
 	for i = 1, a do
-		FrameAnim.playing[i] = network($)
+		FrameAnim.playing[i] = n($)
 	end--]]
-
-end)
+end
 
 
 
 -- Uncomment for Example
+--[[addHook("NetVars", function(network)
+	FrameAnim.netvars(network)
+end)
+
+addHook("ThinkFrame", function()
+	FrameAnim.Thinker()
+end)--]]
 --[[addHook("ThinkFrame", function()
 
 	-- Checks for existing
 	print(FrameAnim.checkexisting("existing"))
 
-		local s = P_SpawnMobj(-64*FU, -96*FU, 32*FU, MT_PULL)
 	if leveltime == 2*TICRATE then 
+		local s = P_SpawnMobj(-64*FU, -96*FU, 32*FU, MT_PULL)
 		-- FrameAnim.add("name", s, SPR_EGGM, A, F)
 		-- FrameAnim.add("name", s, SPR_EGGM, V, W, {loop=2*TICRATE})
 		-- FrameAnim.add("name", s, SPR_PIKE, A, P)
