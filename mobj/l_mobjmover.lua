@@ -31,8 +31,7 @@ function MobjMover.moveto(n, source, mtarget, args)
 		end
 	end
 
-	table.insert(MobjMover.travelling,
-	{
+	local mt = {
 		name=n,
 		mobj=source,
 		angle=args and args.angle,
@@ -44,7 +43,15 @@ function MobjMover.moveto(n, source, mtarget, args)
 		movetime=0,
 		stopped=false,
 		ended=false,
-	})
+	}
+
+	-- (This will be ignored if the companion script does not exist at all)
+	-- Add a reference to a target event if the library exists
+	if ((args and args.eventref) and MobjMover.EventExists()) then
+		mt.eventref = args.eventref
+	end
+
+	table.insert(MobjMover.travelling, mt)
 end
 
 function MobjMover.seek(n, callback)
@@ -55,6 +62,7 @@ function MobjMover.seek(n, callback)
 			end
 			return true
 		end
+		-- TODO: no requiring name case to affect all movers
 	end
 	return false
 end
@@ -80,19 +88,53 @@ function MobjMover.ismoving(n)
 	return MobjMover.seek(n)
 end
 
-function MobjMover.waitmovedone(event, n)
-	if not _G["Event"] then print("Event script is not loaded!") return end
-	if (MobjMover.ismoving(n)) then Event.pause(event) else Event.resume(event) end
+-- ================
+-- Event Extension
+-- Checks if a certain script is loaded to extend some of it's features
+function MobjMover.EventExists()
+	if not _G["Event"] then print("(!)\x82 This function requires 'Event' to work!") return false else return true end
 end
 
-function MobjMover.Thinker()
+-- Add a custom wrapper event + others when the companion script exists
+if MobjMover.EventExists() then
 
+	-- Check if an object is still moving
+	function MobjMover.waitmovedone(event, n)
+		if (MobjMover.ismoving(n) and MobjMover.EventExists()) then Event.pause(event) else Event.resume(event) end
+	end
+
+	-- Sets a mobj moveto target with the ability to stop an event
+	-- until movement is finished when the library is added
+	-- (Replacement for Event.newsub moveto calls)
+	function MobjMover.moveto_ev(n, source, mtarget, args)
+		Event.start("_ev_mobjmover", {movername=n, moversource=source, movertarget=mtarget, moverargs=args or {}})
+	end
+
+	Event.new("_ev_mobjmover", {
+	function(c, e)
+		c.moverargs.eventref = e -- set self ref
+		MobjMover.moveto(c.movername, c.moversource, c.movertarget, c.moverargs)
+	end})
+
+end
+
+
+-- ================
+
+function MobjMover.Thinker()
+	
 	for i=1, #MobjMover.travelling do
 		
 		local mover = MobjMover.travelling[i]
 
 		-- Remove if set to be ended
 		if (mover and mover.ended) then
+
+			-- event library is added: Resume event when ended to prevent locking or accidentally resuming
+			if (mover.eventref and MobjMover.EventExists()) then
+				Event.resume(mover.eventref)
+			end
+
 			table.remove(MobjMover.travelling, i)
 		end
 
@@ -105,13 +147,20 @@ function MobjMover.Thinker()
 		(function()
 		if (mover and not mover.ended) then
 
+			-- Lock to final target position and end the movement
 			if (mover.movetime > FRACUNIT) then
+				-- TODO: run a net-safe callback when ended?
 				P_TeleportMove(mover.mobj, mover.target.x, mover.target.y, mover.target.z)
 				mover.ended = true
 				return
 			end
 			
-			if (mover.stopped) then return end
+			if (mover.stopped) then return end -- stop movement
+
+			-- event library is added: Allow the event to pause if the mover passes the reference to it
+			if (mover.eventref and MobjMover.EventExists()) then
+				Event.stop(mover.eventref)
+			end
 
 			mover.movetime = $1+mover.movepercent -- percent to move per frame
 
@@ -131,8 +180,8 @@ function MobjMover.Thinker()
 			-- Move in an arc motion horizontally or vertically
 			if mover.arc then
 				local ang = FixedMul(ANGLE_180, mover.movetime)
-				movex = $+P_ReturnThrustX(nil, moveangle+ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
-				movey = $+P_ReturnThrustY(nil, moveangle+ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
+				movex = $+P_ReturnThrustX(nil, moveangle + ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
+				movey = $+P_ReturnThrustY(nil, moveangle + ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
 				movez = $-FixedMul(mover.arc.vert or 0, sin(ang))
 			end
 
@@ -147,12 +196,26 @@ function MobjMover.Thinker()
 	end
 end
 
+function MobjMover.netvars(n)
+	MobjMover.travelling = n($)
+
+	--[[local a = #MobjMover.travelling
+	a = n(a)
+	for i = 1, a do
+		MobjMover.travelling[i] = n($)
+	end--]]
+end
+
+
 -- Example code
---[[addHook("ThinkFrame", function()
-MobjMover.Thinker()
+--[[addHook("NetVars", function(network)
+	MobjMover.netvars(network)
 end)
 
 addHook("ThinkFrame", function()
+MobjMover.Thinker()
+end)--]]
+--[[addHook("ThinkFrame", function()
 	-- Moves directly to 0,0,56
 	if leveltime == 2*TICRATE then
 		server.mo.s = P_SpawnMobj(server.mo.x, server.mo.y, server.mo.z, MT_THOK)
@@ -180,4 +243,7 @@ addHook("ThinkFrame", function()
 	if (leveltime == 13*TICRATE) then
 		MobjMover.pause("test", false)
 	end
-end)--]]
+end)
+--]]
+
+
