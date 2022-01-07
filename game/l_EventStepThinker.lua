@@ -336,14 +336,8 @@ function Event.gototaguntil(event, tagname, cond)
 	end
 end
 
--- Aliases for these while keeping the old for backwards compatability
-Event.setloop = Event.settag
-Event.gotoloop = Event.gototag
-Event.gotoloopuntil = Event.gototaguntil
-
-
 -- Forces an event to wait until a set time
-local function wait(event, time)
+function Event.wait(event, time)
 
 	-- TODO: deleteme (compare before deletion)
 	--[[-- sleep time is over
@@ -375,7 +369,7 @@ local function wait(event, time)
 end
 
 -- Waits until the condition is true, then unsuspend the event (with callback at end)
-local function waitUntil(event, cond, end_func)
+function Event.waitUntil(event, cond, end_func)
 	if not (cond) then
 		event.status = "suspended"
 	else
@@ -390,7 +384,7 @@ end
 
 -- Pauses the entire state until its signal is responded to
 -- (attempted rewrite without waiting_on_signal)
-local function waitSignal(event, signalname)
+function Event.waitSignal(event, signalname)
 	if (event.signal == "") then
 		event.status = "suspended"
 		event.signal = signalname
@@ -402,7 +396,7 @@ local function waitSignal(event, signalname)
 end
 
 -- Activates a signal
-local function signal(signalname)
+function Event.signal(signalname)
 	
 	-- Seek all signals named similarly
 	Event.searchtable(function(i, evclass)
@@ -424,7 +418,7 @@ end
 
 -- Does a function once on an event during a wait()
 -- (for multiple, use doOrder instead)
-rawset(_G, "doOnce", function(event, func)
+function Event.doOnce(event, func)
 	-- Run once when looptracker is under 1 (thanks for this)
 	if event.looptrack < 1 then
 		
@@ -433,10 +427,10 @@ rawset(_G, "doOnce", function(event, func)
 		Event.printdebug("doOnce has been launched.")
 	end
 	event.looptrack = $1+1
-end)
+end
 
 -- Waits until the condition is true, then unsuspend the event (wrapper ver.)
-rawset(_G, "doUntil", function(event, cond, while_func, end_func)
+function Event.doUntil(event, cond, while_func, end_func)
 	if not (cond) then
 		while_func()
 		event.status = "suspended"
@@ -450,10 +444,10 @@ rawset(_G, "doUntil", function(event, cond, while_func, end_func)
 
 		Event.printdebug("doUntil has ended.")
 	end
-end)
+end
 
 -- Starts a list of functions per gameframe, and suspends itself on the last
-rawset(_G, "doOrder", function(event, funclist)
+function Event.doOrder(event, funclist)
 
 	-- Increase loop tracker until the end of the list
 	-- TODO: ordertype such as loop, anim(ation), or multi?
@@ -467,7 +461,7 @@ rawset(_G, "doOrder", function(event, funclist)
 		do funclist[event.looptrack]() end
 	end
 
-end)
+end
 
 -- This function progresses the state inside the event forward
 local function EventStateProgressor(e)
@@ -607,7 +601,7 @@ function Event.MapReloadClearEvents()
 end
 
 -- When specified, run an event by name on map load, and do other kinds of stuff
-addHook("MapLoad", function(gamemap)
+function Event.h_MapLoad(gamemap)
 	
 	Event.MapReloadClearEvents()
 
@@ -622,6 +616,11 @@ addHook("MapLoad", function(gamemap)
  	if (mapheaderinfo[gamemap].globalevent) then
 		Event.start(mapheaderinfo[gamemap].globalevent:gsub("%z", ""))
 	end
+
+end
+
+addHook("MapLoad", function(gamemap)
+	Event.h_MapLoad(gamemap)
 end)
 
 addHook("MapChange", function()
@@ -630,10 +629,18 @@ end)
 
 addHook("ThinkFrame", Event.RunEvents)
 
--- Globals
-rawset(_G, "wait", wait)
-rawset(_G, "waitUntil", waitUntil)
-rawset(_G, "signal", signal)
-rawset(_G, "waitSignal", waitSignal)
+-- Global aliases
 
+-- Aliases for these while keeping the old for backwards compatability
+rawset(_G, "wait", Event.wait)
+rawset(_G, "waitUntil", Event.waitUntil)
+rawset(_G, "signal", Event.signal)
+rawset(_G, "waitSignal", Event.waitSignal)
+rawset(_G, "doOnce", Event.doOnce)
+rawset(_G, "doUntil", Event.doUntil)
+rawset(_G, "doOrder", Event.doOrder)
+
+Event.setloop = Event.settag
+Event.gotoloop = Event.gototag
+Event.gotoloopuntil = Event.gototaguntil
 
