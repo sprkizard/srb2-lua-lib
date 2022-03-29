@@ -1,168 +1,327 @@
 --[[
-* l_textboxes.lua
+* l_textboxesv2.lua
 * (sprkizard)
-* (October 26, 2020, 0:00)
-* Desc: A rewrite of textboxes used in sugoi2, with
-	a more minimalistic graphical style
+* (March 29, 2022, 0:00)
+* Desc: A re-rewrite of textboxes used in sugoi2, with
+	a more minimalistic graphical style and more features
 
 * Usage: TODO: check wiki???
 
 * Depends on:
-	hudlayers
-	EventStepThinker
+	TODO: (none atm)
 ]]
 
-rawset(_G, "TextBox", {debug=true})
+rawset(_G, "TextBox", {dialogs={}, debug=true})
 
-function TextBox.new(event, player, name, text)
+local textboxes = {}
 
-	if not ( (player and player.mo.valid)
-	and (player and player.textbox) ) then return end -- both player nor textbox table exists
-	
-	-- Initialize text settings, and run the textbox
-	if not player.textbox.text then
-		-- local _tb = {}
-		player.textbox.strcnt = 0 + player.textbox.startpos
-		player.textbox.linetime = 0
-		player.textbox.speaker = name
-		player.textbox.text = text
-		-- player.textbox = _tb
+-- mockcode: 
+-- if leveltime 4 seconds then Textbox.add(id for identifier, name for talker, text for text, arguments for settings)
+
+-- textbox add (settings: text sound, autoprogress timer, start position, subtitle, speed, delay, relative x,y position, absolute x,y position, cecho)
+	-- has unique identifier to allow for multiple boxes on screen
+	-- also has unique identifier to allow a text change on the same box
+		-- (nextid=2 \\ textid[number] equals {name is 'Amy', text is 'Hello World!', autotime is 4s, skin is skin for this text, etc})
+
+function TextBox.debug(v,x,y,textbox)
+	if not TextBox.debug then return end
+	local str = textbox.text:gsub("\n", " ")
+	local info_output = string.format("ID: %d | Name: %s | Text: %s | Icon: %s | Printed: %d/%d | Auto: [%d/%d]| rel: (%d,%d) | abs: (%d,%d)", 
+		textbox.id or 0, tostring(textbox.name),str,tostring(textbox.icon),textbox.strpos,#textbox.text,textbox.linetime,textbox.auto,textbox.rx or 0,textbox.ry or 0,textbox.ax or 0,textbox.ay or 0)
+	v.drawString(x, y, info_output, V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "small-thin")
+end
+
+-- TODO: can i stop pasting this in multiple scripts every time i need it? :D
+function TextBox.randomchoice(choices)
+    local RandomKey = P_RandomRange(1, #choices)
+    if type(choices[RandomKey]) == "function" then
+        choices[RandomKey]()
+    else
+        return choices[RandomKey]
+    end
+end
+
+function TextBox.add(boxid, args)
+	if type(boxid) == "string" then print("Box ID must be a number!") return end
+
+	-- Wipe the last id and overwrites it with a new under the same id
+	if textboxes[boxid] then textboxes[boxid] = nil end
+
+	local new_tb = {
+		id = boxid,
+		name = (args and args.name) or "",
+		text = (args and args.text) or " ",
+		icon = (args and args.icon),
+		showbg = 1,
+		auto = (args and args.auto) or 3*TICRATE,
+		nextid = (args and args.nextid),
+		speed = (settings and settings.speed) or 1,
+		-- delay = (settings and settings.delay) or 1,
+		soundbank = (args and args.soundbank) or {opensfx=nil,printsfx=nil,compsfx=nil,nextsfx=nil,endsfx=nil},
+		sb_atend=false,
+		-- startpos = (settings and settings.startpos) or 0,
+		rx = (args and args.rx),
+		ry = (args and args.ry),
+		ax = (args and args.ax),
+		ay = (args and args.ay),
+		strpos = 0,-- + startpos,
+		linetime = 0,
+		closing=false,
+	}
+	textboxes[boxid] = new_tb
+end
+
+-- textbox update
+-- 	play ticker sound
+-- 	check if printed string is above the text length
+-- 		has autoprogress timer
+-- 			count up line timer to reach automatic timelimit
+-- 		or
+-- 		wait for button press (default jump or change in textbox settings) if has no autoprogress timer
+-- 			close the textbox or turn to (nextid=) textbox text page
+-- 		or else (autotimer ran out)
+-- 			close the textbox or turn to (nextid=) textbox text page
+-- 	increment text printing position; by speed or delay
+
+-- New text id for chaining dialogue together
+function TextBox.next_text(id, box)
+
+	-- nextid is a number, find a new defined id in the dialogue table
+	if (type(box.nextid) == "number") then
+		-- TODO: nextid for secondary ids?
+		TextBox.add(id, TextBox.dialogs[box.nextid])
+
+	-- nextid is a table, allows for searching a user-defined table that has stored dialogue
+	elseif (type(box.nextid) == "table") then
+		local userdef = box.nextid[1] -- id user-named
+		local nextid = box.nextid[2] -- id
+		TextBox.add(id, TextBox.dialogs[userdef][nextid])
 	end
-	TextBox.textbox_update(event, player)
+
 end
 
--- Sets textbox configuration settings in advance to keep the .new function cleaner
--- (want to reset all? leave settings empty)
-function TextBox.Setconfig(player, settings)
+-- Plays sound in the update function by type
+function TextBox.playdialogsound(txtbox, soundtype)
+	if (soundtype == "start") then
+		-- TODO: (Unsure when this is played, check reference)
+	elseif (soundtype == "open") then
 
-	if not ( (player and player.mo.valid)
-	and (player and player.textbox) ) then return end -- both player nor textbox table exists
-	
-	-- This should initialize once before the textbox contains text
-	if not player.textbox.text then
-		player.textbox.icon = (settings and settings.icon) or "NONEICO"
-		player.textbox.textsfx = (settings and settings.sfx) or sfx_none
-		player.textbox.auto = (settings and settings.auto) or 3*TICRATE
-		player.textbox.startpos = (settings and settings.startpos) or 0
-		player.textbox.speed = (settings and settings.speed) or 1
-		player.textbox.delay = (settings and settings.delay) or 1
-		-- player.textbox.offset = {}
-	end
-end
+		-- Plays when the dialog is opened
+		if (txtbox.soundbank and txtbox.soundbank.opensfx) then
+			S_StartSound(nil, txtbox.soundbank.opensfx)
+		end
+	elseif (soundtype == "print") then
 
-local function P_SetupTextboxes(player)
+		-- Plays on each letter printed
+		if (txtbox.soundbank and txtbox.soundbank.printsfx) then
+			if (txtbox.strpos < txtbox.text:len())
+			and not (txtbox.text:sub(txtbox.strpos):byte() == 0 or txtbox.text:sub(txtbox.strpos):byte() == 32)
+			and (txtbox.strpos % txtbox.speed == 0) then
 
-		-- Set textbox information
-		player.textbox = {
-			speaker = nil, -- the name inserted into speaker field (can be anything)
-			text = nil, -- the current text
-			icon = "NONEICO", -- icon to use to besides the text\
-			textsfx = sfx_none, -- text printing sound
-			strcnt = 0, -- the amount of the string that is shown
-			linetime = 0, -- the time spent on current block of text
-			-- offset = {x = 0, y = 0}, -- the offset of the textbox
-			-- textoffset = {x = 0, y = 0}, -- the offset of the text
-			-- iconoffset = {x = 0, y = 0}, -- the offset of the icon
-			auto = 2*TICRATE, -- set a timer to advance to the next block
-			startpos = 0, -- modify the starting position
-			speed = 1, -- text printing speed
-			-- selection = nil,
-		}
-		-- TODO: in the future maybe we can put multiple text boxes on screen?
-		-- or instead, works like movienight emoji (anything non-player floats above mobj)
-		-- player.textboxes = {}
-		-- player.renders = {} -- TODO: do we need renders if hudlayers can do casebycase?
-end
-
--- TODO: this used to be a mapload hook, is playerspawn better? find out (probably is)
-addHook("PlayerSpawn", function(player)
-	-- for player in players.iterate do
-		P_SetupTextboxes(player)
-	-- end
-end)
-
--- Textbox controller
-function TextBox.textbox_update(event, player)
-
-	if not ( (player and player.mo.valid)
-	and (player and player.textbox) ) then return end -- both player nor textbox table exists
-	
-	local textbox = player.textbox
-
-	-- TODO: how to use an event wait, and reset the textblock at the same time?
-	-- Run when string exists in text
-	if (textbox.text) then
-		
-		-- Play a sound on each letter, skipping spaces and nl
-		if (textbox.textsfx) then
-			if (textbox.strcnt < textbox.text:len())
-			and not (textbox.text:sub(textbox.strcnt):byte() == 0 or textbox.text:sub(textbox.strcnt):byte() == 32)
-			and (textbox.strcnt % textbox.speed == 0) then
-				S_StartSound(nil, textbox.textsfx)
+				-- Take a table if given, and mix the sounds around!
+				if (type(txtbox.soundbank.printsfx) == "table") then
+					S_StartSound(nil, TextBox.randomchoice(txtbox.soundbank.printsfx))
+				else
+					S_StartSound(nil, txtbox.soundbank.printsfx)
+				end
 			end
 		end
+	elseif (soundtype == "complete") then
 
-		-- Check if we reached the end of the string, and clear textbox if we did
-		if (textbox.strcnt >= textbox.text:len()) then
+		-- Plays at completion
+		if (txtbox.soundbank and txtbox.soundbank.compsfx and not txtbox.sb_atend) then
+			S_StartSound(nil, txtbox.soundbank.compsfx)
+			txtbox.sb_atend = true
+		end
+	elseif (soundtype == "next") then
 
-			-- We finish automatically on a set time, or end on button press
-			if (textbox.auto and textbox.linetime < textbox.auto) then
-				player.textbox.linetime = $1+1
-				-- print(string.format("[text auto: %d/%d]", textbox.linetime, textbox.auto))
-			elseif not (textbox.auto) and (player.cmd.buttons & BT_JUMP) then
-				textbox.text = nil
+		-- Plays on the trigger to progress to a next set
+		if (txtbox.soundbank and txtbox.soundbank.nextsfx) then
+			S_StartSound(nil, txtbox.soundbank.nextsfx)
+		end
+	elseif (soundtype == "end") then
+
+		-- Plays at the event which removes the dialog
+		if (txtbox.soundbank and txtbox.soundbank.endsfx) then
+			S_StartSound(nil, txtbox.soundbank.endsfx)
+		end
+	end
+end
+
+function TextBox.textbox_update()
+
+	for id,txtbox in pairs(textboxes) do
+
+		if (txtbox.closing) then
+			textboxes[id] = nil
+			break
+		end
+
+		-- Plays printing sounds (while ignoring spaces and nothing)
+		TextBox.playdialogsound(txtbox, "print")
+
+		-- (The text string position has reached the end of the string length)
+		if (txtbox.strpos >= txtbox.text:len()) then
+
+			-- Automatic progression is enabled so use the user-defined or default value
+			if (txtbox.auto and txtbox.linetime < txtbox.auto) then
+				txtbox.linetime = $1+1
+
+				-- Play a sound at the completion of dialog (triggers only once)
+				TextBox.playdialogsound(txtbox, "complete")
+
+			-- Wait for button press if no automatic, and a button is specified instead
+			elseif not (txtbox.auto) and (txtbox.button and player.cmd.buttons & txtbox.button) then
+				-- close the textbox or turn to (nextid=) textbox text id
+				if (txtbox.nextid) then
+					TextBox.next_text(id, txtbox)
+					TextBox.playdialogsound(txtbox, "next")
+				else
+					txtbox.closing = true
+					TextBox.playdialogsound(txtbox, "end")
+				end
 			else
-				textbox.text = nil -- set to automatically end for auto if neither
+				-- close the textbox or turn to (nextid=) textbox text id
+				if (txtbox.nextid) then
+					TextBox.next_text(id, txtbox)
+					TextBox.playdialogsound(txtbox, "next")
+				else
+					txtbox.closing = true
+					TextBox.playdialogsound(txtbox, "end")
+				end
 			end
+
 		else
-			-- Increment string.sub
-			if (leveltime % textbox.delay == 0) then
-				player.textbox.strcnt = min($1 + 1*textbox.speed, textbox.text:len())
-			end
-			-- print(string.format("[text subcnt: %d/%d]", textbox.strcnt, textbox.text:len()))
+			txtbox.strpos = min($1 + 1, txtbox.text:len())
 		end
 	end
-	waitUntil(event, textbox.text == nil) -- pause the event until text is nil, not empty
 end
 
--- Text Box drawer
-function TextBox.textbox_drawer(a, v, stplyr, cam)
+-- textbox drawer:
+-- 	(predefined screen width/height)
+-- 	(predefined boxheight)
+-- 	(set origin point for textbox)
+-- 	(set icon offset - 4)
+-- 	textbox relative x,y setting exists:
+-- 		add coordinates to origin position
+-- 	or
+-- 	textbox absolute x,y setting exists:
+-- 		replace origin position coordinates
+-- 	draw pixel stretched background
+-- 	draw icon:
+-- 		add to text offset if icon is drawn - 52
+-- 	draw name
+-- 	draw text
 
-	if not stplyr and stplyr.textbox then return end -- both player nor textbox table exists
+function TextBox.textbox_drawer(v, stplyr, cam)
 
+	-- TODO: center/right aligned math
 	-- Screen settings
 	local scrwidth = v.width() / v.dupx() -- screen width
 	local scrheight = v.height() / v.dupy() -- screen height
 
 	local boxheight = 52 -- textbox height (52:78)
+	
+	-- v.drawFill(320/2, 0, 1, 200, 35)
+	-- v.drawFill(320/2, 200/2, 320, 1, 160)
 
 	-- Prepare a textbox (snap to bottom)
-	if (stplyr.textbox and stplyr.textbox.text) then
+	for _,textbox in pairs(textboxes) do
 
-		-- Draw the background to scale to the screen edges
-		-- TODO: until drawfill gets alpha values, use a graphic...
-		-- v.drawFill((320-scrwidth)/2, 200-boxheight, scrwidth,boxheight, 31|V_SNAPTOBOTTOM|V_40TRANS)
-		v.drawScaled(((320-scrwidth)/2)*FRACUNIT, (200-boxheight)*FRACUNIT, FRACUNIT*v.dupx(), v.cachePatch("PRMPTBG"), V_30TRANS|V_SNAPTOBOTTOM)
+		-- Textbox origin point (x,y) (top-left)
+		local prompt_x = ((320-scrwidth)/2)
+		local prompt_y = (200-boxheight)
+		local textoffset = 4 -- icon offset
 
-		-- The text box has a speaker
-		if (stplyr.textbox.speaker) then
-			v.drawString(52, 153, "\x82"..stplyr.textbox.speaker, V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "left")
+		-- Set custom coordinates of the textbox (relative/absolute)
+		if (textbox.rx ~= nil or textbox.ry ~= nil) then
+			prompt_x = $1 + (textbox.rx or 0)
+			prompt_y = $1 - (textbox.ry or 0)
+		elseif (type(textbox.ax) == "number" and type(textbox.ay) == "number") then
+			prompt_x = (textbox.ax)
+			prompt_y = (textbox.ay)-17
+			textoffset = 0
 		end
 
-		-- Draw the icon
-		v.drawScaled(4*FRACUNIT, 152*FRACUNIT, FRACUNIT/6, v.cachePatch(stplyr.textbox.icon), V_SNAPTOBOTTOM)
+		TextBox.debug(v, prompt_x, prompt_y-4, textbox)
 
-		-- Draw the text
-		v.drawString(52, 165, stplyr.textbox.text:sub(0, stplyr.textbox.strcnt), V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "left")
+		-- Draw the background to stretch to the screen edges
+		if (textbox.showbg) then
+			v.drawStretched(prompt_x*FU, prompt_y*FU, scrwidth*FU, boxheight*FU, v.cachePatch("~031G"), V_30TRANS|V_SNAPTOBOTTOM)
+		end
+
+		-- Draw the icon (4:152) (+ text offset)
+		if (textbox.icon) then
+			v.drawScaled((prompt_x+4)*FU, (prompt_y+4)*FU, FRACUNIT/6+FU/160, v.cachePatch(textbox.icon), V_SNAPTOBOTTOM)
+			textoffset = 52
+		end
+
+		-- Show name (52:153)
+		if (textbox.name) then
+			v.drawString(prompt_x+textoffset, prompt_y+4, "\x82"..textbox.name, V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "left")
+		end
+
+		-- Draw the text (52:165)
+		v.drawString(prompt_x+textoffset, prompt_y+17, textbox.text:sub(0, textbox.strpos), V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "left")
 	end
 end
 
+hud.add(TextBox.textbox_drawer, "game")
 
-R_AddHud("Player_TextBoxes", 1, nil, TextBox.textbox_drawer)
---addHook("PlayerThink", TextBox.textbox_update)
+-- local textboxes = {
+-- 	-- {id=1, name="Amy Rose", text="Demo 1\nDemo 1\nDemo 1", icon=true, strcnt=0, showbg=1},
+-- 	-- {id=2, name=nil, text="Demo 2", icon=false, ax=320/2,ay=200/2, strcnt=0, showbg=1}
+-- }
 
-rawset(_G, "SetTextConfig", SetTextConfig)
-rawset(_G, "Speak", Speak)
+function TextBox.addDialog(category, textid, icon, name, text, args, soundbank)
+
+	local newargs = args or {}
+
+	newargs.boxid = id
+	newargs.name = name
+	newargs.text = text
+	newargs.icon = icon
+	newargs.soundbank = soundbank
+
+	if (category) then
+		if not TextBox.dialogs[category] then TextBox.dialogs[category] = {} end
+		TextBox.dialogs[category][textid] = newargs
+	else
+		TextBox.dialogs[textid] = newargs
+	end
+
+end
+
+function TextBox.getDialog(category, textid)
+	if (category) then
+		if not (TextBox.dialogs[category]) then print("\x82WARNING:\x80 User-defined dialog does not exist!") end
+		return TextBox.dialogs[category][textid]
+	else
+		return TextBox.dialogs[textid]
+	end
+end
+
+local testsndbank = {opensfx=sfx_wwopen,printsfx={sfx_bubbl1,sfx_bubbl2,sfx_bubbl3,sfx_bubbl4,sfx_bubbl5,},compsfx=sfx_wwcomp,nextsfx=sfx_wwnext,endsfx=sfx_wwclos}
+
+-- Examples:
+TextBox.addDialog(nil, 1, "AMYRTALK", "Amy", "This is a test dialog that\nwill print sound effects on\ndifferent textbox events.", {nextid=9}, testsndbank)
+TextBox.addDialog(nil, 9, "AMYRTALK", "Amy", "This is the next set of\ndialog.", nil, testsndbank)
+-- TextBox.dialogs = {
+TextBox.dialogs[2] = {icon="AMYRTALK", name="Amy", text="This is a new text page.", nextid=3}
+TextBox.dialogs[3] = {icon="AMYRTALK", name="Amy", text="This is page three,\nwhich is also the end."}
 
 
+TextBox.dialogs["Custom"] = {}
+TextBox.dialogs["Custom"][6] = {icon="AMYRTALK", name="Amy", text="This is a custom categorized\ndialoge! This is to prevent\noverwrites and conflicts!"}
 
+-- Creates a new textbox 
+addHook("ThinkFrame", function()
+	TextBox.textbox_update()
+	
+	if leveltime == 3*TICRATE then
+		TextBox.add(1, TextBox.getDialog(nil, 1))
+		-- TextBox.add(1, {icon="AMYRTALK", name="Amy", text="Hello world!", nextid={"Custom", 6}})
+		-- TextBox.add(12, {icon="AMYRTALK", name="Amy", text="Hello world!", rx=0, ry=100, nextid=2})
+	end
+
+end)
