@@ -13,6 +13,7 @@
 
 rawset(_G, "TextBox", {dialogs={}, debug=true})
 
+-- textbox update/display table
 local textboxes = {}
 
 -- mockcode: 
@@ -23,6 +24,7 @@ local textboxes = {}
 	-- also has unique identifier to allow a text change on the same box
 		-- (nextid=2 \\ textid[number] equals {name is 'Amy', text is 'Hello World!', autotime is 4s, skin is skin for this text, etc})
 
+-- Prints information on top of the dialog box
 function TextBox.debug(v,x,y,textbox)
 	if not TextBox.debug then return end
 	local str = textbox.text:gsub("\n", " ")
@@ -41,34 +43,40 @@ function TextBox.randomchoice(choices)
     end
 end
 
-function TextBox.add(boxid, args)
+-- Adds a new dialog to the screen
+function TextBox.add(boxid, args, soundbank)
 	if type(boxid) == "string" then print("Box ID must be a number!") return end
-
-	-- Wipe the last id and overwrites it with a new under the same id
-	if textboxes[boxid] then textboxes[boxid] = nil end
 
 	local new_tb = {
 		id = boxid,
 		name = (args and args.name) or "",
 		text = (args and args.text) or " ",
 		icon = (args and args.icon),
-		showbg = 1,
 		auto = (args and args.auto) or 3*TICRATE,
 		nextid = (args and args.nextid),
-		speed = (settings and settings.speed) or 1,
-		-- delay = (settings and settings.delay) or 1,
-		soundbank = (args and args.soundbank) or {opensfx=nil,printsfx=nil,compsfx=nil,nextsfx=nil,endsfx=nil},
-		sb_atend=false,
-		-- startpos = (settings and settings.startpos) or 0,
+		speed = (args and args.speed) or 1,
+		delay = (args and args.delay) or 1,
+		soundbank = (args and args.soundbank) or soundbank or {opensfx=nil,printsfx=nil,compsfx=nil,nextsfx=nil,endsfx=nil},
+		sb_atend=false, -- for compsfx
 		rx = (args and args.rx),
 		ry = (args and args.ry),
 		ax = (args and args.ax),
 		ay = (args and args.ay),
+		showbg = 1,
+		startpos = (args and args.startpos) or 0,
 		strpos = 0,-- + startpos,
 		linetime = 0,
 		closing=false,
 	}
+
+	-- Wipe the last id and overwrites it with a new under the same id (moved below def to prevent sound from playing each overwrite)
+	if textboxes[boxid] then textboxes[boxid] = nil else
+		-- Plays when opened
+		TextBox.playdialogsound(new_tb, "start")
+	end
+
 	textboxes[boxid] = new_tb
+
 end
 
 -- textbox update
@@ -83,7 +91,7 @@ end
 -- 			close the textbox or turn to (nextid=) textbox text page
 -- 	increment text printing position; by speed or delay
 
--- New text id for chaining dialogue together
+-- Uses new text id for chaining dialogue together
 function TextBox.next_text(id, box)
 
 	-- nextid is a number, find a new defined id in the dialogue table
@@ -102,14 +110,14 @@ end
 
 -- Plays sound in the update function by type
 function TextBox.playdialogsound(txtbox, soundtype)
-	if (soundtype == "start") then
-		-- TODO: (Unsure when this is played, check reference)
-	elseif (soundtype == "open") then
 
+	if (soundtype == "start") then
 		-- Plays when the dialog is opened
-		if (txtbox.soundbank and txtbox.soundbank.opensfx) then
-			S_StartSound(nil, txtbox.soundbank.opensfx)
+		if (txtbox.soundbank and txtbox.soundbank.startsfx) then
+			S_StartSound(nil, txtbox.soundbank.startsfx)
 		end
+	elseif (soundtype == "open") then
+		-- TODO: (played on a prompt)
 	elseif (soundtype == "print") then
 
 		-- Plays on each letter printed
@@ -148,10 +156,12 @@ function TextBox.playdialogsound(txtbox, soundtype)
 	end
 end
 
+-- Updater
 function TextBox.textbox_update()
 
 	for id,txtbox in pairs(textboxes) do
 
+		-- Remove dialog from table if ended
 		if (txtbox.closing) then
 			textboxes[id] = nil
 			break
@@ -178,6 +188,7 @@ function TextBox.textbox_update()
 					TextBox.playdialogsound(txtbox, "next")
 				else
 					txtbox.closing = true
+					TextBox.playdialogsound(txtbox, "start")
 					TextBox.playdialogsound(txtbox, "end")
 				end
 			else
@@ -187,6 +198,7 @@ function TextBox.textbox_update()
 					TextBox.playdialogsound(txtbox, "next")
 				else
 					txtbox.closing = true
+					TextBox.playdialogsound(txtbox, "start")
 					TextBox.playdialogsound(txtbox, "end")
 				end
 			end
@@ -273,6 +285,7 @@ hud.add(TextBox.textbox_drawer, "game")
 -- 	-- {id=2, name=nil, text="Demo 2", icon=false, ax=320/2,ay=200/2, strcnt=0, showbg=1}
 -- }
 
+-- Adds a new dialog
 function TextBox.addDialog(category, textid, icon, name, text, args, soundbank)
 
 	local newargs = args or {}
@@ -292,6 +305,7 @@ function TextBox.addDialog(category, textid, icon, name, text, args, soundbank)
 
 end
 
+-- Gets a dialog by id
 function TextBox.getDialog(category, textid)
 	if (category) then
 		if not (TextBox.dialogs[category]) then print("\x82WARNING:\x80 User-defined dialog does not exist!") end
@@ -301,27 +315,32 @@ function TextBox.getDialog(category, textid)
 	end
 end
 
-local testsndbank = {opensfx=sfx_wwopen,printsfx={sfx_bubbl1,sfx_bubbl2,sfx_bubbl3,sfx_bubbl4,sfx_bubbl5,},compsfx=sfx_wwcomp,nextsfx=sfx_wwnext,endsfx=sfx_wwclos}
 
 -- Examples:
+TextBox.addDialog(nil, 2, "AMYRTALK", "Amy", "Apples\noranges\nbananas", {nextid=3}, {printsfx=sfx_oratxt})
+TextBox.addDialog(nil, 3, "AMYRTALK", "Amy", "(A soundbank is being\nused for printing)", {nextid=4}, {printsfx=sfx_oratxt})
+TextBox.addDialog(nil, 4, "AMYRTALK", "Amy", "This is the third dialog\nchain which is also the end.\nGood-bye!", nil, {printsfx=sfx_oratxt})
+TextBox.addDialog("Custom", 6, "AMYRTALK", "Amy", "This is a custom categorized\ndialoge! This is to prevent\noverwrites and conflicts!", nil, {printsfx=sfx_bttx5})
+
+local testsndbank = {startsfx=sfx_strpst,printsfx=sfx_radio,compsfx=sfx_menu1,nextsfx=sfx_appear,endsfx=sfx_addfil}
+
 TextBox.addDialog(nil, 1, "AMYRTALK", "Amy", "This is a test dialog that\nwill print sound effects on\ndifferent textbox events.", {nextid=9}, testsndbank)
 TextBox.addDialog(nil, 9, "AMYRTALK", "Amy", "This is the next set of\ndialog.", nil, testsndbank)
--- TextBox.dialogs = {
-TextBox.dialogs[2] = {icon="AMYRTALK", name="Amy", text="This is a new text page.", nextid=3}
-TextBox.dialogs[3] = {icon="AMYRTALK", name="Amy", text="This is page three,\nwhich is also the end."}
-
-
-TextBox.dialogs["Custom"] = {}
-TextBox.dialogs["Custom"][6] = {icon="AMYRTALK", name="Amy", text="This is a custom categorized\ndialoge! This is to prevent\noverwrites and conflicts!"}
 
 -- Creates a new textbox 
 addHook("ThinkFrame", function()
+
 	TextBox.textbox_update()
 	
-	if leveltime == 3*TICRATE then
-		TextBox.add(1, TextBox.getDialog(nil, 1))
-		-- TextBox.add(1, {icon="AMYRTALK", name="Amy", text="Hello world!", nextid={"Custom", 6}})
-		-- TextBox.add(12, {icon="AMYRTALK", name="Amy", text="Hello world!", rx=0, ry=100, nextid=2})
+	if (leveltime == 3*TICRATE) then
+		TextBox.add(1, {icon="AMYRTALK", name="Amy", text="Hello world!\n(I am editing directly)"})
+	elseif (leveltime == 9*TICRATE) then
+		TextBox.add(12, {icon="AMYRTALK", name="Amy", text="Hello world!", rx=0, ry=100})
+	elseif (leveltime == 15*TICRATE) then
+		TextBox.add(12, TextBox.getDialog(nil, 2))
+	elseif (leveltime == 30*TICRATE) then
+		TextBox.add(12, TextBox.getDialog("Custom", 6))
+	elseif (leveltime == 40*TICRATE) then
+		TextBox.add(12, TextBox.getDialog(nil, 1))
 	end
-
 end)
