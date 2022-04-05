@@ -10,21 +10,12 @@
 * Depends on:
 	TODO: (none atm)
 ]]
+-- TODO: subtitle/cecho mode, speed, delay, add to playerlist function, custom text background, icon frames
 
-rawset(_G, "TextBox", {dialogs={}, debug=true})
+rawset(_G, "TextBox", {dialogs={}, debug=false})
 
 -- textbox update/display table
 local textboxes = {}
-
--- mockcode: 
--- if leveltime 4 seconds then Textbox.add(id for identifier, name for talker, text for text, arguments for settings)
-
--- textbox add (settings: text sound, autoprogress timer, start position, subtitle, speed, delay, relative x,y position, absolute x,y position, cecho)
-	-- has unique identifier to allow for multiple boxes on screen
-	-- also has unique identifier to allow a text change on the same box
-		-- (nextid=2 \\ textid[number] equals {name is 'Amy', text is 'Hello World!', autotime is 4s, skin is skin for this text, etc})
-	-- only the player that initiated add can press buttons to proceed
-	-- boxes are not shown to players if they cannot see them or did not open them
 
 -- Prints information on top of the dialog box
 function TextBox.debug(v,x,y,textbox)
@@ -175,17 +166,6 @@ local function seekplayers2(f, list)
 		f(list[i])
 	end
 end
--- textbox update
--- 	play ticker sound
--- 	check if printed string is above the text length
--- 		has autoprogress timer
--- 			count up line timer to reach automatic timelimit
--- 		or
--- 		wait for button press (default jump or change in textbox settings) if has no autoprogress timer
--- 			close the textbox or turn to (nextid=) textbox text page
--- 		or else (autotimer ran out)
--- 			close the textbox or turn to (nextid=) textbox text page
--- 	increment text printing position; by speed or delay
 
 -- Uses new text id for chaining dialogue together
 function TextBox.next_text(id, box)
@@ -331,22 +311,6 @@ function TextBox.textbox_update()
 	end
 end
 
--- textbox drawer:
--- 	(predefined screen width/height)
--- 	(predefined boxheight)
--- 	(set origin point for textbox)
--- 	(set icon offset - 4)
--- 	textbox relative x,y setting exists:
--- 		add coordinates to origin position
--- 	or
--- 	textbox absolute x,y setting exists:
--- 		replace origin position coordinates
--- 	draw pixel stretched background
--- 	draw icon:
--- 		add to text offset if icon is drawn - 52
--- 	draw name
--- 	draw text
-
 function TextBox.textbox_drawer(v, stplyr, cam)
 
 	-- TODO: center/right aligned math
@@ -432,10 +396,6 @@ addHook("ThinkFrame", function()
 	TextBox.textbox_update()
 end)
 
--- TODO: delete
---[[addHook("PlayerSpawn", function(player)
-	player.indialog = true
-end)--]]
 
 
 
