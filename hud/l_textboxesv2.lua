@@ -381,6 +381,9 @@ end
 
 hud.add(TextBox.textbox_drawer, "game")
 
+function TextBox.netvars(n)
+	textboxes = n($)
+end
 
 
 -- Hooks
@@ -396,6 +399,9 @@ addHook("ThinkFrame", function()
 	TextBox.textbox_update()
 end)
 
+addHook("NetVars", function(network)
+	TextBox.netvars(network)
+end)
 
 
 
