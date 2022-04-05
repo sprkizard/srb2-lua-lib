@@ -50,7 +50,7 @@ function TextBox.randomchoice(choices)
 end
 
 -- Adds a new dialog to the screen with a box identifier (TODO: ranges 10k-32k reserved for players with multiple ids?)
-function TextBox.add(boxid, args, player, soundbank)
+function TextBox.add(boxid, args, playerslist, soundbank)
 	if type(boxid) == "string" then print("Box ID must be a number!") return end
 
 	local new_tb = {
@@ -75,7 +75,7 @@ function TextBox.add(boxid, args, player, soundbank)
 		linetime = 0,
 		closing = false,
 		persist = false, -- TODO: finish kept dialogs later
-		player = player,
+		playerlist = playerslist,
 	}
 
 	-- Wipe the last id and overwrites it with a new one under the same id (moved below def to prevent sound from playing each overwrite)
@@ -83,7 +83,7 @@ function TextBox.add(boxid, args, player, soundbank)
 	if textboxes[boxid] then
 
 		-- Keeps the players used in the last dialog block if they exist
-		if textboxes[boxid].player then	new_tb.player = textboxes[boxid].player end
+		if textboxes[boxid].playerlist then	new_tb.playerlist = textboxes[boxid].playerlist end
 		
 		-- TOOO: Keeps the button prompt if given until it's set to zero
 		-- if textboxes[boxid].button and new_tb.button ~= 0 then new_tb.button = textboxes[boxid].button end
@@ -101,6 +101,22 @@ function TextBox.add(boxid, args, player, soundbank)
 	textboxes[boxid] = new_tb
 
 end
+
+-- TODO: add 'players included' tables easily
+--[[function TextBox.addPlayer(boxid, args, player)
+	
+	local table_player = {}
+	
+	for player in players.iterate do
+		if TextBox.isvalid(player) and player.rings > 1 then table.insert(table_player, player) end
+		-- if (#player == 0) then player.indialog = true end
+		-- TextBox.add(12, TextBox.getDialog(nil, 1), player)
+		print(string.format("Player List Count: %d | Player: %d - Rings: %d", #table_player or -1, #player, player.rings))
+	end
+
+	TextBox.add(12, TextBox.getDialog(nil, 10), table_player)
+	TextBox.add((boxid + #player)*-1, args, player)
+end--]]
 
 -- Adds a new dialog
 function TextBox.newDialog(category, textid, icon, name, text, args, soundbank)
@@ -154,6 +170,11 @@ function TextBox.refreshlist(removespecial)
 	end
 end
 
+local function seekplayers2(f, list)
+	for i=1, #list do
+		f(list[i])
+	end
+end
 -- textbox update
 -- 	play ticker sound
 -- 	check if printed string is above the text length
@@ -186,11 +207,13 @@ end
 -- Plays sound in the update function by type
 function TextBox.playdialogsound(txtbox, soundtype)
 
-	local plyr = nil -- TODO: unsure if needed with below line TextBox.isvalid(txtbox.player) or nil
+	local plyr = nil -- TODO: unsure if needed with below line TextBox.isvalid(txtbox.playerlist) or nil
 
 	-- Ensures that sounds only play for the displayed player (incl. spectating) and not everybody at once
 	-- also for players that do not have a dialog open by exclusion
-	if (TextBox.isvalid(consoleplayer) and not consoleplayer.indialog and displayplayer == consoleplayer) then return end
+	seekplayers2(function(p)
+		if (TextBox.isvalid(consoleplayer) and consoleplayer ~= p and displayplayer == consoleplayer) then return end
+		-- if (TextBox.isvalid(consoleplayer) and not consoleplayer.indialog and displayplayer == consoleplayer) then return end
 
 	if (soundtype == "start") then
 		-- Plays when the dialog is opened
@@ -234,19 +257,22 @@ function TextBox.playdialogsound(txtbox, soundtype)
 			S_StartSound(nil, txtbox.soundbank.endsfx, plyr)
 		end
 	end
+	end, txtbox.playerlist)
 end
 
 -- Updater
 function TextBox.textbox_update()
+
+	if titlemap and titlemapinaction then return end
 
 	for id,txtbox in pairs(textboxes) do
 
 		-- Remove dialog from table if ended
 		if (txtbox.closing) then
 			textboxes[id] = nil
-			break
+			continue
 		end
-		-- print(txtbox.player[1].mo.momx)
+
 		-- Plays printing sounds (while ignoring spaces and nothing)
 		TextBox.playdialogsound(txtbox, "print")
 
@@ -256,7 +282,7 @@ function TextBox.textbox_update()
 			-- Wait for button press if no automatic, and a button is specified
 			if (txtbox.button) then
 
-				txtbox.linetime = 0 --txtbox.button*-1
+				txtbox.linetime = 0
 
 				-- Play a sound at the completion of dialog (triggers only once)
 				if not txtbox.sb_atend then
@@ -265,16 +291,19 @@ function TextBox.textbox_update()
 				end
 
 				-- close the textbox or turn to (nextid=) textbox text id
-				if  (txtbox.player[1].cmd.buttons & txtbox.button) then
-					if (txtbox.nextid) then
-						TextBox.next_text(id, txtbox)
-						TextBox.playdialogsound(txtbox, "next")
-					else
-						txtbox.closing = true
-						TextBox.playdialogsound(txtbox, "start")
-						TextBox.playdialogsound(txtbox, "end")
+				seekplayers2(function(p)
+					if  (p.cmd.buttons & txtbox.button) then
+						if (txtbox.nextid) then
+							TextBox.next_text(id, txtbox)
+							TextBox.playdialogsound(txtbox, "next")
+						else
+							txtbox.closing = true
+							TextBox.playdialogsound(txtbox, "start")
+							TextBox.playdialogsound(txtbox, "end")
+						end
 					end
-				end
+				end,txtbox.playerlist)
+
 			-- Automatic progression is enabled so use the user-defined or default value instead
 			elseif (txtbox.auto and txtbox.linetime < txtbox.auto) then
 				txtbox.linetime = $1+1
@@ -333,12 +362,12 @@ function TextBox.textbox_drawer(v, stplyr, cam)
 	-- (Not much can be done about splitscreen except prevent it from drawing twice)
 	if splitscreen and stplyr == displayplayer then return end
 
-	-- Prevent players from seeing dialogs if they are not included
-	if not stplyr.indialog then return end
-	-- if textbox.player == displayplayer then return end
-
 	-- Prepare a textbox (snap to bottom)
 	for _,textbox in pairs(textboxes) do
+
+	-- Prevent players from seeing dialogs if they are not viewing their own (excluding viewing others)
+	seekplayers2(function(p)
+		if (TextBox.isvalid(consoleplayer) and stplyr ~= p) then return end
 
 		-- Textbox origin point (x,y) (top-left)
 		local prompt_x = ((320-scrwidth)/2)
@@ -382,6 +411,7 @@ function TextBox.textbox_drawer(v, stplyr, cam)
 		-- Draw the text (52:165)
 		v.drawString(prompt_x+textoffset, prompt_y+17, textbox.text:sub(0, textbox.strpos), V_ALLOWLOWERCASE|V_SNAPTOBOTTOM, "left")
 
+	end,textbox.playerlist)
 	end
 end
 
@@ -389,11 +419,7 @@ hud.add(TextBox.textbox_drawer, "game")
 
 
 
-
-addHook("PlayerSpawn", function(player)
-	player.indialog = true
-end)
-
+-- Hooks
 addHook("MapLoad", function()
 	TextBox.refreshlist()
 end)
@@ -402,7 +428,14 @@ addHook("MapChange", function()
 	TextBox.refreshlist()
 end)
 
+addHook("ThinkFrame", function()
+	TextBox.textbox_update()
+end)
 
+-- TODO: delete
+--[[addHook("PlayerSpawn", function(player)
+	player.indialog = true
+end)--]]
 
 
 
@@ -412,6 +445,7 @@ end)
 
 
 -- Examples:
+--[[
 TextBox.newDialog(nil, 2, "AMYRTALK", "Amy", "Apples\noranges\nbananas", {nextid=3}, {printsfx=sfx_oratxt})
 TextBox.newDialog(nil, 3, "AMYRTALK", "Amy", "(A soundbank is being\nused for printing)", {nextid=4}, {printsfx=sfx_oratxt})
 TextBox.newDialog(nil, 4, "AMYRTALK", "Amy", "This is the third dialog\nchain which is also the end.\nGood-bye!", nil, {printsfx=sfx_oratxt})
@@ -425,27 +459,45 @@ TextBox.newDialog(nil, 9, "AMYRTALK", "Amy", "This is the next set of\ndialog.",
 -- Button and sound trigger stuff
 TextBox.newDialog(nil, 10, "AMYRTALK", "Amy", "Press [jump] to continue.", {nextid=11, button=BT_JUMP}, {printsfx=sfx_oratxt,nextsfx=sfx_appear})
 TextBox.newDialog(nil, 11, "AMYRTALK", "Amy", VERSIONSTRING.." is the latest SRB2 version.\n[jump]", {nextid=12, button=BT_JUMP}, -1)
-TextBox.newDialog(nil, 12, "AMYRTALK", "Amy", "Text 1 [jump]", {nextid=13, button=BT_JUMP})
-TextBox.newDialog(nil, 13, "AMYRTALK", "Amy", "Text 2", {nextid=14})
-TextBox.newDialog(nil, 14, "AMYRTALK", "Amy", "Text 3", {nextid=15})
+TextBox.newDialog(nil, 12, "AMYRTALK", "Amy", "Text 1 [jump]", {nextid=13, button=BT_JUMP}, -1)
+TextBox.newDialog(nil, 13, "AMYRTALK", "Amy", "Text 2", {nextid=14}, -1)
+TextBox.newDialog(nil, 14, "AMYRTALK", "Amy", "Text 3", {nextid=15}, -1)
 TextBox.newDialog(nil, 15, "AMYRTALK", "Amy", "Text 4 [jump]", {nextid=16, button=BT_JUMP})
 TextBox.newDialog(nil, 16, "AMYRTALK", "Amy", "Press [spin] to end.", {button=BT_SPIN}, {printsfx=sfx_oratxt,endsfx=sfx_appear})
 TextBox.newDialog(nil, 17, "AMYRTALK", "Amy", "New dialog 1", {button=BT_SPIN})
 
--- TODO: store playerlists in text boxes and add a method to exclude players in a function primarily towards individual player boxes
+
 -- Creates a new textbox 
 addHook("ThinkFrame", function()
 
-	TextBox.textbox_update()
-	
-	if (leveltime == 3*TICRATE) then
-		
-		local table_player = {}
-		
-		for player in players.iterate do
-			if TextBox.isvalid(player) then table.insert(table_player, player) end
-		end
+	-- # 1 various boxes
+	-- if leveltime == 3*TICRATE then
+	-- 	TextBox.add(1, {icon="AMYRTALK", name="Amy", text="Hello world!\n(I am editing directly)"})
+	-- elseif (leveltime == 9*TICRATE) then
+	-- 	TextBox.add(12, {icon="AMYRTALK", name="Amy", text="Hello world!", rx=0, ry=100})
+	-- elseif (leveltime == 15*TICRATE) then
+	-- 	TextBox.add(12, TextBox.getDialog(nil, 2))
+	-- elseif (leveltime == 30*TICRATE) then
+	-- 	TextBox.add(12, TextBox.getDialog("Custom", 6))
+	-- elseif (leveltime == 40*TICRATE) then
+	-- 	TextBox.add(12, TextBox.getDialog(nil, 1))
+	-- end
 
-		TextBox.add(12, TextBox.getDialog(nil, 10), table_player)
+	-- # 2 per player
+	-- if (leveltime == 5*TICRATE) then
+		
+	-- 	local table_player = {}
+		
+	-- 	for player in players.iterate do
+	-- 		if TextBox.isvalid(player) and player.rings > 1 then table.insert(table_player, player) end
+	-- 		print(string.format("Player List Count: %d | Player: %d - Rings: %d", #table_player or -1, #player, player.rings))
+	-- 	end
 
-end)
+	-- 	TextBox.add(12, TextBox.getDialog(nil, 10), table_player)
+	-- end
+
+	-- # 3 Overwrite
+	-- if (leveltime == 6*TICRATE) then
+	-- 	TextBox.add(12, TextBox.getDialog(nil, 17), table_player)
+	-- end
+end)--]]
