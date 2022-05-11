@@ -54,6 +54,7 @@ end
 
 -- Wrapper for checking if player is on an axis
 function axis2d.PlayerOnAxis(player)
+	if not player and player.mo.valid then return end
 	return (player.mo.currentaxis) and true or false
 end
 
