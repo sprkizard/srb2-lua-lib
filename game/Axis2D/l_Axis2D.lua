@@ -52,6 +52,11 @@ function axis2d.IsControlStyle(player)
 
 end
 
+-- Wrapper for checking if player is on an axis
+function axis2d.PlayerOnAxis(player)
+	return (player.mo.currentaxis) and true or false
+end
+
 -- Refreshes the axis cache if needed
 function axis2d.CheckAxes()
 	if axes.lastmap ~= gamemap then
