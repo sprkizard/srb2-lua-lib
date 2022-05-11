@@ -9,11 +9,6 @@
 
 rawset(_G, "MobjMover", {travelling={}})
 
--- TODO: replace with easing when the time comes
-function MobjMover._lerp(a, b, t)
-	return a + FixedMul(b - a, t)
-end
-
 -- Sets up a new mover (pls be stable and worth using)
 function MobjMover.moveto(n, source, mtarget, args)
 	
@@ -35,7 +30,9 @@ function MobjMover.moveto(n, source, mtarget, args)
 		name=n,
 		mobj=source,
 		angle=args and args.angle,
+		noangle=args and args.noangle,
 		startpos={x=source.x, y=source.y, z=source.z},
+		ease=args and args.ease or "linear",
 		arc=args and args.arc,
 		target=mtarget,
 		speed=tspeed,
@@ -165,16 +162,16 @@ function MobjMover.Thinker()
 			mover.movetime = $1+mover.movepercent -- percent to move per frame
 
 			-- Interpolate the constant movement on all axis based on the distance
-			local movex = MobjMover._lerp(mover.startpos.x, mover.target.x, mover.movetime)
-			local movey = MobjMover._lerp(mover.startpos.y, mover.target.y, mover.movetime)
-			local movez = MobjMover._lerp(mover.startpos.z, mover.target.z, mover.movetime)
+			local movex = ease[mover.ease](mover.movetime, mover.startpos.x, mover.target.x)
+			local movey = ease[mover.ease](mover.movetime, mover.startpos.y, mover.target.y)
+			local movez = ease[mover.ease](mover.movetime, mover.startpos.z, mover.target.z)
 			local moveangle = R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
 
 			-- Set mobj angle (if only a number exists :v)
 			if (type(mover.angle) == "number") then
-				mover.mobj.angle = mover.angle
+				mover.mobj.angle = mover.noangle and $1 or mover.angle
 			else
-				mover.mobj.angle = R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
+				mover.mobj.angle = mover.noangle and $1 or R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
 			end
 
 			-- Move in an arc motion horizontally or vertically
