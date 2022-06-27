@@ -1,7 +1,7 @@
 --[[
 * l_EventStepThinker.lua
 * (sprkizard)
-* (September ‎18, ‎2020, 3:39)
+* (September 18, 2020, 3:39)
 * Desc: A set of functions to run map events in the same style of
 	Pokémon Mystery Dungeon: Gates to Infinity.
 	(Inspired by a script made by fickleheart and D00D64)
@@ -12,7 +12,11 @@
 
 ]]
 
--- TODO: remove deleteme labeled pieces of code when proven to be 70% stable
+-- Prevent duplicate loading
+if _G["EventList"] then
+	print("(!)\x81 ALERT: EventStepThinker is already loaded. The script will be skipped.")
+	return
+end
 
 rawset(_G, "Event", {debug=false})
 rawset(_G, "EVE", Event)
@@ -20,12 +24,9 @@ rawset(_G, "EVE", Event)
 -- The events created on initialization
 rawset(_G, "EventList", {})
 
--- TODO: deleteme
--- rawset(_G, "EventList",{events={},subevents={}})
 
 -- global table for running events (disable for now)
 local Running_Events = {}
--- rawset(_G, "Running_Events",{})
 
 -- Sets a metatable to get function data from
 local eventMT = {
@@ -42,7 +43,29 @@ local eventMT = {
 registerMetatable(eventMT)
 
 
+-- Attempts to sort pairs
+local function spairs(t, order)
+    -- collect the keys
+    local keys = {}
+    for k in pairs(t) do keys[#keys+1] = k end
 
+    -- if order function given, sort by it by passing the table and keys a, b,
+    -- otherwise just sort the keys 
+    if order then
+        table.sort(keys, function(a,b) return order(t, a, b) end)
+    else
+        table.sort(keys)
+    end
+
+    -- return the iterator function
+    local i = 0
+    return function()
+        i = i + 1
+        if keys[i] then
+            return keys[i], t[keys[i]]
+        end
+    end
+end
 
 -- Reduce redundancy when looking through the event tables
 function Event.searchtable(f, issubevent)
@@ -52,20 +75,6 @@ function Event.searchtable(f, issubevent)
 			do f(k, evclass) end
 		end)()
 	end
-	-- TODO: deleteme
-	--[[if not issubevent then
-		for k,evclass in pairs(EventList.events) do
-		(function()
-			do f(k, evclass) end
-		end)()
-		end
-	else
-		for k,evclass in pairs(EventList.subevents) do
-		(function()
-			do f(k, evclass) end
-		end)()
-		end
-	end--]]
 end
 
 -- Prints a debug message
@@ -168,18 +177,7 @@ function Event.__endEvent(ev)
 	ev.status = "dead"
 end
 
--- TODO: deleteme
---[[function Event.__resetEvent(ev)
-	ev.status = "normal"
-	ev.step = 1
-	ev.signal = ""
-	ev.tags = {}
-	ev.sleeptime = 0
-	ev.looptrack = 0
-end--]]
 
-
--- TODO: deleteme
 -- TODO: find a new use for this since anonymous functions are dead
 -- Creates a userdata block'name' (usually when printed from tostring)
 --[[local function randomUserBlockName()
@@ -263,23 +261,7 @@ function Event.destroy(eventname, seekall)
 				return
 			end
 		end)
-	end
-	-- TODO: deleteme
-	--else
-		-- Seek all events named similarly
-		--[[for _,evclass in pairs(EventList.events) do
-			if (string.match(evclass.name, eventname)) then
-				Event.__endEvent(evclass)
-				Event.printdebug(string.format("Event [%s] declared dead by Event.destroy /!\\", evclass.name))
-			end
-		end
-		for _,evclass in pairs(EventList.subevents) do
-			if (string.match(evclass.name, eventname) then
-				Event.__endEvent(evclass)
-				Event.printdebug(string.format("Event [%s] declared dead by Event.destroy /!\\", evclass.name))
-			end
-		end--]]
-	--end	
+	end	
 end
 
 -- Destroys a group of states all in one go
@@ -313,12 +295,6 @@ function Event.settag(event, tagname)
 	return event.step
 end
 
--- TODO: deleteme
--- function Event.removetag(event, tagname)
--- 	event.tags[tagname] = nil
--- 	Event.printdebug(string.format("Removed tag[%s].", tagname))
--- end
-
 -- Go to the tag number given in the current state
 function Event.gototag(event, tagname)
 	event.step = event.tags[tagname]
@@ -337,7 +313,7 @@ function Event.gototaguntil(event, tagname, cond)
 end
 
 -- Forces an event to wait until a set time
-function Event.wait(event, time)
+function Event.wait(event, time, singleuse)
 
 	-- TODO: deleteme (compare before deletion)
 	--[[-- sleep time is over
@@ -363,6 +339,16 @@ function Event.wait(event, time)
 	-- Count down
 	if (event.sleeptime > 0) then
 		event.sleeptime = max(0, $1-1)
+		event.looptrack = singleuse and $1+1 or 0
+	else
+		event.status = "resumed"
+	end
+end
+
+local function waitcountdown(event)
+	-- Count down
+	if (event.sleeptime > 0) then
+		event.sleeptime = max(0, $1-1)
 	else
 		event.status = "resumed"
 	end
@@ -384,25 +370,25 @@ end
 
 -- Pauses the entire state until its signal is responded to
 -- (attempted rewrite without waiting_on_signal)
-function Event.waitSignal(event, signalname)
+function Event.waitSignal(event, signalname, identifier)
 	if (event.signal == "") then
 		event.status = "suspended"
 		event.signal = signalname
 		Event.printdebug(string.format("[%s]: Seeking signal '%s'...", event.name, signalname))
-	elseif (event.signal == signalname .. "_resp") then
+	elseif (event.signal == signalname .. "_resp" .. (identifier or "")) then
 		event.status = "resumed"
 		event.signal = ""
 	end
 end
 
 -- Activates a signal
-function Event.signal(signalname)
+function Event.signal(signalname, identifier)
 	
 	-- Seek all signals named similarly
 	Event.searchtable(function(i, evclass)
 		if (string.match(evclass.signal, signalname)) then
 
-			evclass.signal = $1 .."_resp"
+			evclass.signal = $1 .."_resp" .. (identifier or "")
 
 			Event.printdebug(string.format("Signal '%s' found! Continuing...", signalname))
 			return
@@ -410,27 +396,8 @@ function Event.signal(signalname)
 	end)
 end
 
--- TODO: deleteme
--- function Event.for(start, max, skip, func)
--- 	for start, max, skip do
--- 	end
--- end
-
--- Does a function once on an event during a wait()
--- (for multiple, use doOrder instead)
-function Event.doOnce(event, func)
-	-- Run once when looptracker is under 1 (thanks for this)
-	if event.looptrack < 1 then
-		
-		func()
-
-		Event.printdebug("doOnce has been launched.")
-	end
-	event.looptrack = $1+1
-end
-
 -- Waits until the condition is true, then unsuspend the event (wrapper ver.)
-function Event.doUntil(event, cond, while_func, end_func)
+--[[function Event.doUntil(event, cond, while_func, end_func)
 	if not (cond) then
 		while_func()
 		event.status = "suspended"
@@ -444,7 +411,7 @@ function Event.doUntil(event, cond, while_func, end_func)
 
 		Event.printdebug("doUntil has ended.")
 	end
-end
+end--]]
 
 -- Starts a list of functions per gameframe, and suspends itself on the last
 function Event.doOrder(event, funclist)
@@ -482,7 +449,11 @@ local function EventStateProgressor(e)
 		if e.status == "stopped" then return end
 
 		-- TODO: what if suspended, and we want the step function to run only once?
-		do e.states[e.step](e.vars, e, e.caller or nil) end -- Run functions (:
+		if not e.looptrack then
+			do e.states[e.step](e.vars, e, e.caller or nil) end -- Run functions (:
+		else
+			waitcountdown(e)
+		end
 
 		-- the event is waiting/yielded
 		if e.status == "suspended" then return end
@@ -500,7 +471,8 @@ end
 -- Handles running events similar to coroutines, but only when they are activated
 function Event.RunEvents(event)
 
-	for key,evclass in pairs(Running_Events) do
+	for key,evclass in spairs(Running_Events, function(t,a,b) return t[b].name < t[a].name end) do
+	-- for key,evclass in pairs(Running_Events) do
 	-- for key,evclass in pairs(EventList.events) do
 		
 		-- The status is dead, remove
@@ -514,11 +486,6 @@ function Event.RunEvents(event)
 		-- end)()
 
 	end
-
-	-- TODO: deleteme
-	-- for key,evclass in pairs(EventList.subevents) do
-	-- 	EventStateProgressor(evclass)
-	-- end
 end
 
 function Event.netvars(n)
@@ -551,32 +518,7 @@ Vars:
 
 -- Syncs table data over netplay so players are not de-synced on join
 addHook("NetVars", function(network)
-
 	Event.netvars(network)
-
-	-- TODO: deleteme
-	--[[for key,obj in pairs(EventList.events) do
-		obj.name = network($)
-		obj.status = network($)
-		obj.step = network($)
-		obj.signal = network($)
-		obj.tags = network($)
-		obj.sleeptime = network($)
-		obj.looptrack = network($)
-		obj.vars = network($)
-	end
-
-	for key,obj in pairs(EventList.subevents) do
-		obj.name = network($)
-		obj.status = network($)
-		obj.step = network($)
-		obj.signal = network($)
-		obj.tags = network($)
-		obj.sleeptime = network($)
-		obj.looptrack = network($)
-		-- obj.vars = network($)
-	end--]]
-
 end)
 
 -- Destroy all events on map change
@@ -586,18 +528,6 @@ function Event.MapReloadClearEvents()
 		if ev and ev.persist then return end
 		Event.__endEvent(ev)
 	end)
-
-	-- TODO: deleteme
-	--[[for k,object in pairs(Running_Events) do
-		if not object.persist then 
-		Event.__endEvent(object)
-	end--]]
-	--[[for k,object in pairs(EventList.events) do
-		Event.__resetEvent(object)
-	end
-	for k,object in pairs(EventList.subevents) do
-		Event.__resetEvent(object)
-	end--]]
 end
 
 -- When specified, run an event by name on map load, and do other kinds of stuff
