@@ -60,6 +60,10 @@ end
 
 -- Refreshes the axis cache if needed
 function axis2d.CheckAxes()
+
+	-- 6-30-2022: Only check if used through map headers
+	if not mapheaderinfo[gamemap].axis2d then return end
+
 	if axes.lastmap ~= gamemap then
 		axes = {lastmap = gamemap}
 		print("Preparing Axis2D cache...")
@@ -385,13 +389,12 @@ function axis2d.EjectPlayer(player)
 
 	player.mo.currentaxis = nil
 
-	-- Reset status, and remove movevars
+	-- Reset status
 	if not (player.mo.currentaxis) then
 		player.normalspeed = skins[player.mo.skin].normalspeed
 		player.thrustfactor = skins[player.mo.skin].thrustfactor
 		player.accelstart = skins[player.mo.skin].accelstart
 		player.acceleration = skins[player.mo.skin].acceleration
-		player.movevars = nil
 		if player.charability == CA_THOK then
 			player.actionspd = skins[player.mo.skin].actionspd
 		end
@@ -741,8 +744,6 @@ addHook("PlayerThink", function(player)
 			end
 		end
 		
-	elseif player.movevars then
-		axis2d.EjectPlayer(player)
 	end
 end)
 
@@ -881,15 +882,7 @@ addHook("MobjThinker", function(mo)
 	end
 end, MT_FLINGRING)
 
-
--- Fail-safe to eject and reset all players on map change (if no movevars or currentaxis)
-addHook("MapChange", function()
-
-	for player in players.iterate do
-
-		-- salt: extra safety
-		if not (player.mo and player.mo.valid) continue end
-		
-		axis2d.EjectPlayer(player)
-	end
-end)
+-- TODO:
+-- Fail-safe to eject and reset all players when they respawn
+-- Prevents a bug that stops you from walking ~sev
+addHook("PlayerSpawn", axis2d.EjectPlayer)
