@@ -137,6 +137,17 @@ function axis2d.SwitchAxis(mo, axisnum, legacyswitch)
 		if mo.currentaxis and mo.currentaxis.flipped then
 			oldangle = $1+ANGLE_180
 		end
+		
+		-- Lactozilla: fix backwards spindash, part 1
+		if mo.ax2d_angle == nil
+			mo.ax2d_angle = mo.angle
+		end
+		if mo.ax2d_dashflags == nil
+			mo.ax2d_dashflags = 0
+		end
+		if mo.ax2d_dashspeed == nil
+			mo.ax2d_dashspeed = 0
+		end
 	end
 	
 	-- This grabs another linedef from the tag
@@ -419,6 +430,14 @@ local function SetCamera(player, x, y, z)
 	P_TeleportMove(player.camera, player.camera.x+(x-player.camera.x)/4, player.camera.y+(y-player.camera.y)/4, player.camera.z+(z-player.camera.z)/4)
 end
 
+addHook("AbilitySpecial", function(player)
+	-- Lactozilla: fix backwards thok, part 1
+	if player.mo.currentaxis then
+		player.mo.angle = player.mo.ax2d_angle
+	end
+end)
+
+
 -- Player management!
 addHook("PlayerThink", function(player)
 
@@ -664,6 +683,21 @@ addHook("PlayerThink", function(player)
 			end
 		end
 		
+		-- Lactozilla: fix backwards thok, part 2
+		mo.ax2d_angle = mo.angle
+
+		-- Lactozilla: fix backwards spindash, part 2
+		if (P_IsObjectOnGround(mo)
+		and not (mo.ax2d_dashflags & PF_SPINDOWN)
+		and (mo.ax2d_dashflags & PF_STARTDASH)
+		and (mo.ax2d_dashflags & PF_SPINNING))
+			-- Correct spindash angle
+			P_InstaThrust(mo, mo.ax2d_angle, FixedMul(mo.ax2d_dashspeed, player.mo.scale))
+		end
+
+		mo.ax2d_dashflags = player.pflags & (PF_SPINDOWN|PF_STARTDASH|PF_SPINNING)
+		mo.ax2d_dashspeed = player.dashspeed
+		
 		-- Rip out normal movement and do it ourselves! Muahaha!
 		player.normalspeed = 0
 		player.thrustfactor = 0
@@ -882,7 +916,6 @@ addHook("MobjThinker", function(mo)
 	end
 end, MT_FLINGRING)
 
--- TODO:
--- Fail-safe to eject and reset all players when they respawn
--- Prevents a bug that stops you from walking ~sev
+-- SeventhSentinel: Fail-safe to eject and reset players when they respawn
+-- TODO: I don't know what I'm doing, there is probably a better way to do this
 addHook("PlayerSpawn", axis2d.EjectPlayer)
