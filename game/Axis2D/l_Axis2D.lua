@@ -2,13 +2,14 @@
 
 * l_Axis2D.lua
 * (sprkizard varren, fickleheart)
-* (March 3, 2020 02:45)
+* (September 13, 2023 18:40)
 
-* Version: 1.2
+* Version: 1.3
 
 * Desc: Public release version 1.2 (refactored somewhat on the afternoon of April 19, 2015)
 		Feel free to use it for your own purposes! In exchange, if you make a change that
 		improves it, please share it with us!
+		1.3 update: Support UDMF
 
 ]]
 
@@ -73,14 +74,10 @@ function axis2d.CheckAxes()
 				local axisinfo = {}
 				axisinfo.x = mo.x
 				axisinfo.y = mo.y
-				axisinfo.radius = mo.spawnpoint.angle
-				axisinfo.flipped = false
-				if axisinfo.radius >= 16384 then
-					axisinfo.radius = $1-16384
-					axisinfo.flipped = true
-				end
-				axes[mo.spawnpoint.options] = axisinfo
-				--print("Storing axis #" .. mo.spawnpoint.options .. " in table...")
+				axisinfo.radius = mo.spawnpoint.args[2]
+				axisinfo.flipped = mo.spawnpoint.args[3]
+				axes[mo.spawnpoint.args[1]] = axisinfo
+				--print("Storing axis #" .. mo.spawnpoint.args[1] .. " in table...")
 				--print(axisinfo.x .. " " .. axisinfo.y .. " " .. axisinfo.radius)
 			elseif mo.type == MT_AXISTRANSFERLINE then
 				--print("Line axis found!")
@@ -88,8 +85,8 @@ function axis2d.CheckAxes()
 				axisinfo.basex = mo.x
 				axisinfo.basey = mo.y
 				axisinfo.angle = mo.angle
-				axes[mo.spawnpoint.options] = axisinfo
-				--print("Storing axis #" .. mo.spawnpoint.options .. " in table...")
+				axes[mo.spawnpoint.args[1]] = axisinfo
+				--print("Storing axis #" .. mo.spawnpoint.args[1] .. " in table...")
 				--print(axisinfo.basex .. " " .. axisinfo.basey .. " " .. axisinfo.angle)
 			elseif mo.type == MT_AXISTRANSFER then
 				continue -- Ignore these, but keep going in the list
@@ -97,7 +94,7 @@ function axis2d.CheckAxes()
 				--print("End of list.")
 				break -- Axis objects always start off the list, so now we know there are no more to parse
 			end
-			axes[mo.spawnpoint.options].number = mo.spawnpoint.options
+			axes[mo.spawnpoint.args[1]].number = mo.spawnpoint.args[1]
 		end
 	end
 end
