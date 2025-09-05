@@ -12,14 +12,13 @@
 
 ]]
 
--- Prevent duplicate loading
+-- TODO: Prevent duplicate loading
 if _G["EventList"] then
 	print("(!)\x81 ALERT: EventStepThinker is already loaded. The script will be skipped.")
 	return
 end
 
 rawset(_G, "Event", {debug=false})
-rawset(_G, "EVE", Event)
 
 -- The events created on initialization
 rawset(_G, "EventList", {})
@@ -43,8 +42,13 @@ local eventMT = {
 registerMetatable(eventMT)
 
 
+-- Defaults to zero value or an alternative if value is nil
+function Event.default(value, altvalue)
+	return (value and not nil) and value or altvalue
+end
+
 -- Attempts to sort pairs
-local function spairs(t, order)
+function Event.spairs(t, order)
     -- collect the keys
     local keys = {}
     for k in pairs(t) do keys[#keys+1] = k end
@@ -67,13 +71,43 @@ local function spairs(t, order)
     end
 end
 
--- Reduce redundancy when looking through the event tables
+-- Reduce redundancy when looking through the event tables. Used internally
 function Event.searchtable(f, issubevent)
 
 	for k,evclass in pairs(Running_Events) do
-		(function()
-			do f(k, evclass) end
-		end)()
+
+		-- Await status change
+		if f(k, evclass) then
+			break
+		end
+		-- TODO: return value
+		-- Fallback
+		-- (function()
+			-- do f(k, evclass) end
+		-- end)()
+	end
+end
+
+-- Seeks an event if it exists, and allows reading its data (editing data: at your own risk)
+function Event.read(name, fn)
+
+	for _, e in pairs(Running_Events) do
+		-- Run under any event name
+		if (e and (name == "any" or name == "all")) then
+			do fn(e.vars, e) end
+		-- Run under a specific name
+		elseif (e and e.name == name) then
+			do fn(e.vars, e) end
+		end
+	end
+end
+
+-- Checks if an event exists
+function Event.exists(name)
+	for _, e in pairs(Running_Events) do
+		if (e and e.name == name) then
+			return true
+		end
 	end
 end
 
@@ -133,7 +167,6 @@ function Event.new(eventname, ftable)
 		if type(v) == "function" then
 			-- add the functions to the state list with arguments (container, event)
 			_event.states[tonumber(k)] = ftable[tonumber(k)]
-			-- _event.states[tonumber(k)] = do ftable[tonumber(k)](_event.vars, _event) end
 		elseif type(v) == "table" then
 			
 			-- Sub-Events in the ftable should be added into the subevents table separately
@@ -143,7 +176,6 @@ function Event.new(eventname, ftable)
 			-- add the functions to the state list with arguments (container, subevent, [parentevent])
 			for i=1,#v do
 				_subevent.states[i] = v[i]
-				-- _subevent.states[i] = do v[i](_event.vars, _subevent, _event) end
 			end
 
 			-- Add subevents into the subevent table
@@ -154,7 +186,6 @@ function Event.new(eventname, ftable)
 
 	-- Add events into the event table
 	EventList[eventname] = _event
-	-- EventList.events[eventname] = _event
 	return _event
 end
 
@@ -168,7 +199,6 @@ function Event.__setupEvent(ev, eventname)
 	ev.sleeptime = EventList[eventname].sleeptime
 	ev.looptrack = EventList[eventname].looptrack
 	ev.vars = {}
-	-- ev.states = EventList[eventname].states
 end
 
 function Event.__endEvent(ev)
@@ -201,7 +231,6 @@ function Event.start(eventname, args, caller)
 	end
 
 	local ev = {}
-	-- local ev = EventList.events[eventname]
 
 	-- Setup the event from the beginning
 	Event.__setupEvent(ev, eventname)
@@ -225,14 +254,6 @@ function Event.start(eventname, args, caller)
 	table.insert(Running_Events, ev)
 end
 
--- Runs a sub event that is inside of another event
--- TODO: check for feature completion
---[[function Event.startsub(subname, args)
-	local ev = EventList.subevents[subname]
-
-	Event.__setupEvent(ev, subname)
-end--]]
-
 -- TODO: seek and stop/resume all if needed
 function Event.stop(event)
 	event.status = "stopped"
@@ -246,28 +267,58 @@ function Event.resume(event)
 	event.status = "running"
 end
 
--- TODO: rework to find complete name or event
--- Destroys an event (searching for part of the name is _maybe_ more effective)
-function Event.destroy(eventname, seekall)
 
-	-- TODO: reduce redundancy
-	-- Seek the first most named event to force end
-	if not (seekall) then
-		Event.searchtable(function(i, ev)
-			if (ev.name == eventname) then
-				Event.__endEvent(ev)
-				Running_Events[ev] = nil
-				Event.printdebug(string.format("(!)\x81 ALERT: Event [%s] was ended early by Event.destroy!", ev.name))
-				return
+-- Destroys any event by found name
+-- (Deletion modes: [find] - Partial name matching / [hasvariable] - Match by variable name / [firstfound] - Only removes the first found event entry)
+function Event.destroy(eventname, mode)
+
+	-- function wrapper to clear the data
+	local function __set_ended(eventdata)
+		Event.__endEvent(eventdata)
+		Running_Events[eventdata] = nil
+		Event.printdebug(string.format("(!)\x81 ALERT: Event [%s] was ended early by Event.destroy!", eventdata.name))
+	end
+
+	mode = Event.default(mode, {})
+
+	Event.searchtable(function(_, ev)
+
+		-- Finds a partial event name match
+		if (mode.find) then
+			if (string.find(ev.name, eventname)) then
+				__set_ended(ev)
+				Event.printdebug(string.format("(!)\x82 (------Find mode: Complete------)", ev.name))
+				return (mode.firstfound) and true or false
 			end
-		end)
-	end	
+		-- Finds a valid variable name inside of the event
+		elseif (mode.var) then -- or mode.hasvar) then
+			if (ev.vars[eventname]) then
+				__set_ended(ev)
+				return (mode.firstfound) and true or false
+			end
+		-- Finds a valid variable name inside of the named event
+		-- ("ev_event1", {hasvar="varname",value=true})
+		elseif (mode.haskey) then
+			if (ev.name == eventname and ev.vars[mode.haskey[1]] == mode.haskey[2]) then
+				__set_ended(ev)
+				return (mode.firstfound) and true or false
+			end
+		-- Default behavior (by name)
+		else
+			if (ev.name == eventname) then
+				__set_ended(ev)
+				Event.printdebug(string.format("(!)\x82 (------Default mode: Complete------)", ev.name))
+				return (mode.firstfound) and true or false
+			end
+		end
+	end)
 end
 
 -- Destroys a group of states all in one go
-function Event.destroygroup(eventnamelist, seekall)
+-- (Deletion modes: [find] - Partial name matching / [hasvariable] - Match by variable name / [firstfound] - Only removes the first found event entry)
+function Event.destroygroup(eventnamelist, mode)
 	for i=1,#eventnamelist do
-		Event.destroy(eventnamelist[i], seekall)
+		Event.destroy(eventnamelist[i], mode)
 	end
 end
 
@@ -300,7 +351,7 @@ function Event.gototag(event, tagname)
 	event.step = event.tags[tagname]
 	event.status = "looped"
 
-	Event.printdebug(string.format("\x82 -------[%s]: Returning to Step %d-------", tagname, event.tags[tagname]))
+	Event.printdebug(string.format("\x82 -------[%s]: Returning to Step %d-------", tagname, event.tags[tagname] or -1))
 end
 
 -- Go to a tag number if a condition is reached
@@ -314,20 +365,6 @@ end
 
 -- Forces an event to wait until a set time
 function Event.wait(event, time, singleuse)
-
-	-- TODO: deleteme (compare before deletion)
-	--[[-- sleep time is over
-	if event.sleeptime <= 1 then event.status = "resumed" end
-
-	if not (event.sleeptime) then
-		-- Set time and suspended status
-		event.status = "suspended"
-		event.sleeptime = time+1
-		
-		Event.printdebug(string.format("[%s] is now waiting.", event.name))
-	else
-		event.sleeptime = max(0, $1-1)
-	end--]]
 	
 	-- Set time and suspended status
 	if (event.sleeptime == 0 and not (event.status == "suspended")) then
@@ -365,6 +402,7 @@ function Event.waitUntil(event, cond, end_func)
 		if (end_func) then
 			end_func()
 		end
+		return true
 	end
 end
 
@@ -396,8 +434,38 @@ function Event.signal(signalname, identifier)
 	end)
 end
 
+-- Executes gallery image popup from a linedef
+function Event.LinedefExecute(line, trigger, sector)
+
+	-- @ Flag Effects:
+	--  [1] Block Enemies:
+	-- 	[6] Not Climbable:
+	--  [10] Repeat Midtexture (E5):
+	-- @ Default: runs EV 'ev_[name]' with the texture of the floor/ceiling being the name of the EV to run
+	--
+	-- if not (trigger and trigger.player and trigger.player.valid) then return end
+
+	local player = trigger and trigger.player or nil
+
+	if (player and player.bot > 0) then return end -- bots shouldn't be able to trigger this
+
+	-- if (line.flags & ML_BLOCKMONSTERS) then
+	-- elseif (line.flags & ML_NOCLIMB) then
+	-- end
+	-- if (line.flags & ML_EFFECT5) then
+	-- end
+
+	local evs_name = string.format("ev_%s", string.lower(line.frontsector.floorpic))
+
+	-- Event.start(seqname:gsub("%z", ""))
+	-- Event.start(string.lower(evs_name), {execplayer=player, execmobj=trigger})
+	Event.start(evs_name, {execsector=sector, execlinedef=line, execmobj=trigger, execplayer=player})
+end
+
+--[[-- Does a function once on an event during a wait()
+-- (for multiple, use doOrder instead)
 -- Waits until the condition is true, then unsuspend the event (wrapper ver.)
---[[function Event.doUntil(event, cond, while_func, end_func)
+rawset(_G, "doUntil", function(event, cond, while_func, end_func)
 	if not (cond) then
 		while_func()
 		event.status = "suspended"
@@ -411,15 +479,14 @@ end
 
 		Event.printdebug("doUntil has ended.")
 	end
-end--]]
+end)
 
 -- Starts a list of functions per gameframe, and suspends itself on the last
-function Event.doOrder(event, funclist)
+rawset(_G, "doOrder", function(event, funclist)
 
 	-- Increase loop tracker until the end of the list
-	-- TODO: ordertype such as loop, anim(ation), or multi?
 	if (event.looptrack < #funclist) then
-		event.looptrack = $1+1	
+		event.looptrack = $1+1
 		event.status = "suspended"
 	end
 
@@ -428,7 +495,7 @@ function Event.doOrder(event, funclist)
 		do funclist[event.looptrack]() end
 	end
 
-end
+end)--]]
 
 -- This function progresses the state inside the event forward
 local function EventStateProgressor(e)
@@ -471,9 +538,8 @@ end
 -- Handles running events similar to coroutines, but only when they are activated
 function Event.RunEvents(event)
 
-	for key,evclass in spairs(Running_Events, function(t,a,b) return t[b].name < t[a].name end) do
+	for key,evclass in Event.spairs(Running_Events, function(t,a,b) return t[b].name < t[a].name end) do
 	-- for key,evclass in pairs(Running_Events) do
-	-- for key,evclass in pairs(EventList.events) do
 		
 		-- The status is dead, remove
 		if (evclass.status == "dead") then
@@ -481,9 +547,6 @@ function Event.RunEvents(event)
 		end
 
 		EventStateProgressor(evclass)
-
-		-- (function()
-		-- end)()
 
 	end
 end
@@ -557,20 +620,6 @@ addHook("MapChange", function()
 	Event.MapReloadClearEvents()
 end)
 
-addHook("ThinkFrame", Event.RunEvents)
+addHook("LinedefExecute", Event.LinedefExecute, "RUN_EVS")
 
--- Global aliases
-
--- Aliases for these while keeping the old for backwards compatability
-rawset(_G, "wait", Event.wait)
-rawset(_G, "waitUntil", Event.waitUntil)
-rawset(_G, "signal", Event.signal)
-rawset(_G, "waitSignal", Event.waitSignal)
-rawset(_G, "doOnce", Event.doOnce)
-rawset(_G, "doUntil", Event.doUntil)
-rawset(_G, "doOrder", Event.doOrder)
-
-Event.setloop = Event.settag
-Event.gotoloop = Event.gototag
-Event.gotoloopuntil = Event.gototaguntil
-
+-- addHook("ThinkFrame", Event.RunEvents)
