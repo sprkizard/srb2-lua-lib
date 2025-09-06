@@ -14,10 +14,7 @@ function EvAction.IsValidMobj(mo)
 	return (mo and mo.valid)
 end
 
-function EvAction.CheckValidMobj(mo)
-	if not (mo and mo.valid) then return end
-end
-
+-- TODO: check to remove
 -- Determines whether or not to use the given player (userdata), or all players (string)
 function EvAction.CheckPlayerTypeValid(player)
 	-- no player exists
@@ -112,7 +109,7 @@ function EvAction.GetDist2D(p1, p2)
 end
 
 -- Custom Random function that uses leveltime in case the random seed desynched
-local function RandomRange_P(min, max)
+local function RandomRange_C(min, max)
 	if min == max then return min end -- What's the point if there's no range?
 
 	-- Well this won't work if min isn't actually min!
@@ -156,7 +153,7 @@ function EvAction.RandomChoice(choices, vanillarandom)
 	if vanillarandom then
 		RandomKey = P_RandomRange(1, #choices)
 	else
-		RandomKey = RandomRange_P(1, #choices)
+		RandomKey = RandomRange_C(1, #choices)
 	end
     if type(choices[RandomKey]) == "function" then
         choices[RandomKey]()
@@ -165,6 +162,7 @@ function EvAction.RandomChoice(choices, vanillarandom)
     end
 end
 
+-- TODO: check to remove
 function EvAction.PickRandomXYZ(choices)
 	local rx = choices[P_RandomRange(1, #choices)]*FRACUNIT
 	local ry = choices[P_RandomRange(1, #choices)]*FRACUNIT
@@ -326,42 +324,6 @@ end
 -- Unfreezes players
 function EvAction.UnfreezePlayers()
 	Event.destroy("a_freeze_player")
-end
-
--- Set a players textbox to another player
-function EvAction.synchronizetextboxes(player, targetplayer)
-	if not (player and player.mo.valid) then return end -- no player exists
-	if not (player.textbox) then return end
-
-	targetplayer.textbox = player.textbox
-
-end
-
--- TODO: re-write for the new hud display
-function EvAction.StartAnimationTimerDisplay(start_time)
-	
-	-- THE LIBRARY IS NOT ADDED
-	if not (_G["R_AddHud"]) then return end
-
-	-- local Time = start_time or 0
-
-	-- R_AddHud("_fsm-animationtimer", 30, nil, function(a, v, stplyr, cam)
-	-- 	Time = $1+1
-	-- 	local Hours = string.format("%02d", G_TicsToHours(Time))
-	-- 	local Minutes = string.format("%02d", G_TicsToMinutes(Time))
-	-- 	local Seconds = string.format("%02d", G_TicsToSeconds(Time))
-	-- 	local Centiseconds = string.format("%02d", G_TicsToCentiseconds(Time))
-	-- 	local Milliseconds = string.format("%02d", G_TicsToMilliseconds(Time))
-	-- 	v.drawString(320/2,5, Hours..":"..Minutes..":"..Seconds..":"..Centiseconds, V_ALLOWLOWERCASE|V_MONOSPACE, "center")
-	-- end)
-end
-
-function EvAction.EndAnimationTimerDisplay(start_time)
-
-	-- THE LIBRARY IS NOT ADDED
-	-- if not (_G["R_DeleteHud"]) then return end
-	
-	R_DeleteHud("_fsm-animationtimer")
 end
 
 -- ------------------------------------------------------
@@ -594,144 +556,6 @@ function EvAction.Sq_CreateMobjActor(container, mobjname, mobjtype, position, at
 	end
 end
 
--- ========
--- Camera Actions
--- ========
-
--- Local shortcut to set awayviewmobj
-local function setawayview(player, awayviewmobj, awayviewaiming, enabled)
-	-- Sets the camera and viewtics to an absurdly high amount
-	if (enabled) then
-		player.awayviewmobj = awayviewmobj
-		player.awayviewtics = INT16_MAX --65535*TICRATE
-		player.awayviewaiming = awayviewaiming or 0
-	else
-		player.awayviewmobj = nil
-		player.awayviewtics = 1
-		player.awayviewaiming = 0 -- awayviewaiming or 0
-	end
-end
-
--- Sets or disables the active camera for the player (prev: netgameOverride)
-function EvAction.setactivecamera(player, targetawaycamera, enabled)
-	if EvAction.CheckPlayerTypeValid(player) then return end
-	-- if not (type(player) == "string") and not (player and player.mo.valid) then return end -- no player exists
-	if not (targetawaycamera and targetawaycamera.valid) then return end
-
-	-- Determine whether to target all players, or just the one given
-	if (type(player) == "string") then
-		EvAction.doforall(function(play)
-			setawayview(play, targetawaycamera, 0, enabled)
-		end)
-	else
-		setawayview(player, targetawaycamera, 0, enabled)
-	end
-
-end
-
--- Sets the camera as 'inactive'
-function EvAction.cameraoverride(player, awaycamera, enabled)
-	-- TODO: pointless player check?
-	-- if not (player and player.mo.valid) then return end -- no player exists
-	if not (awaycamera and awaycamera.valid) then return end
-
-	if (enabled and not awaycamera.inactive) then
-		awaycamera.momz = 0
-	end
-	awaycamera.inactive = enabled
-end
-
--- Sets the camera position (prev: SetEye)
-function EvAction.setcamera(player, awaycamera, position)
-	if EvAction.CheckPlayerTypeValid(player) then return end
-	-- if not (type(player) == "string") and not (player and player.mo.valid) then return end -- no player exists
-	if not (awaycamera and awaycamera.valid) then return end
-
-	-- Determine whether to target all players, or just the one given
-	if (type(player) == "string") then
-		EvAction.doforall(function(play)
-			setawayview(play, awaycamera, (position and position.aiming) or 0, true)
-		end)
-	else
-		setawayview(player, awaycamera, (position and position.aiming) or 0, true)
-	end
-	awaycamera.angle = (position and position.angle) or awaycamera.angle
-
-	-- Use relative position setting, or absolute
-	if (position and position.rel) then
-		P_TeleportMove(awaycamera, awaycamera.x+position.x, awaycamera.y+position.y, awaycamera.z+position.z)
-	else
-		P_TeleportMove(awaycamera, position.x, position.y, position.z)
-	end
-
-	-- TODO: explore if we still need an event to freeze the camera in place
-	-- P_TeleportMove(camera, position.x, position.y, position.z)
-	-- P_TeleportMove(camera, position.x or camera.x, position.y or camera.y, position.z or camera.z)
-end
-
--- Make the camera track a point in space (prev: lookAtZ) (added offsets for better composition)
-function EvAction.cameratrack(player, awaycamera, destination, offseth, offsetv)
-	if EvAction.CheckPlayerTypeValid(player) then return end
-
-	-- point in the direction the camera is already looking if destination's type changes
-	if (type(destination) == "boolean") then
-		destination = {
-			x=awaycamera.x+P_ReturnThrustX(awaycamera, awaycamera.angle, awaycamera.radius + 64*FRACUNIT),
-			y=awaycamera.y+P_ReturnThrustY(awaycamera, awaycamera.angle, awaycamera.radius + 64*FRACUNIT),
-			z=awaycamera.z
-		}
-	end
-
-	local x1, y1, z1 = awaycamera.x, awaycamera.y, awaycamera.z
-	local x2, y2, z2 = destination.x, destination.y, destination.z
-
-	-- Point to track destination, and z height of the destination
-	local hangle = R_PointToAngle2(x1, y1, x2, y2)
-
-	local aimdirection = R_PointToAngle2(0, 0, FixedHypot(x2 - x1, y2 - y1), z2 - z1)
-	
-	if (type(player) == "string") then
-		EvAction.doforall(function(play)
-			setawayview(play, awaycamera, aimdirection + FixedAngle(offsetv or 0), true)
-		end)
-	else
-		setawayview(player, awaycamera, aimdirection + FixedAngle(offsetv or 0), true)
-	end
-	-- Angle
-	awaycamera.angle = hangle + (FixedAngle(offseth or 0))
-end
-
---[[function EvAction.camerashake(player, awaycamera, hangle, hspeed, vangle, vspeed)
-	awaycamera.angle = $1 + FixedAngle(hangle*cos(leveltime*FixedAngle(hspeed)))
-
-	if (type(player) == "string") then
-		EvAction.doforall(function(play)	
-			play.awayviewaiming = $1 + FixedAngle(vangle*sin(leveltime*FixedAngle(vspeed)))
-		end)
-	else	
-		player.awayviewaiming = $1 + FixedAngle(vangle*sin(leveltime*FixedAngle(vspeed)))
-	end
-end--]]
-
-function EvAction.setplayerviewroll(player, rollangle, addangle)
-	if EvAction.CheckPlayerTypeValid(player) then return end
-
-	if (type(player) == "string") then
-		EvAction.doforall(function(play)
-			play.viewrollangle = (addangle==true and $1+rollangle or rollangle)
-		end)
-	else
-		player.viewrollangle = (addangle==true and $1+rollangle or rollangle)
-	end
-end
-
-function EvAction.setcamerapos(mobj, point, prefs)
-
-	if not (mobj and mobj.valid) then return end -- no mobj
-
-	P_TeleportMove(mobj, point.x, point.y, point.z)
-end
-
 -- ------------------------------------------------------
 -- @region OBJECT - Object/Mobj functions
 -- ------------------------------------------------------
@@ -783,7 +607,7 @@ function EvAction.setmobjsprite(mobj, newsprite, newframe)
 
 	if not (mobj and mobj.valid) then return end -- no mobj
 
-	mobj.sprite = newsprite or SPR_UNKN -- fallback to error sprite
+	mobj.sprite = newsprite or SPR_PLAY -- fallback to error sprite (use play, so it's not confusing)
 	if (newframe) then mobj.frame = newframe end
 end
 
@@ -795,6 +619,7 @@ function EvAction.setmobjframe(mobj, newframe)
 	mobj.frame = newframe or 0
 end
 
+-- TODO: check to remove
 -- Event action to set a mobj color, and colorize it
 function EvAction.setmobjcolor(mobj, color, colorize)
 	if (colorize) then
@@ -806,6 +631,7 @@ function EvAction.setmobjcolor(mobj, color, colorize)
 	end
 end
 
+-- TODO: check to remove
 -- Event action to set a mobj shadow scale (warning, edits its radius. useful for NPC)
 function EvAction.setshadowscale(mobj, scale, radius)
 	mobj.shadowscale = scale
@@ -882,236 +708,7 @@ function EvAction.stopmobjmomentum(mobj)
 	mobj.momz = 0
 end
 
--- A wrapper for P_TeleportMove in the eventaction table with extras
-function EvAction.setmobjpos(mobj, point, prefs)
-
-	if not (mobj and mobj.valid) then return end -- no mobj
-	-- if (type(point) == "userdata" and not (point and point.valid)) then return end -- no mobj
-	
-	-- Use relative position setting, or absolute
-	if (prefs and prefs.rel) then
-		P_TeleportMove(mobj, mobj.x+point.x, mobj.y+point.y, mobj.z+point.z)
-	else
-		P_TeleportMove(mobj, point.x, point.y, point.z)
-	end
-
-	-- P_TeleportMove(mobj, point.x, point.y, point.z)
-end
-
--- TODO: slight rework?
-function EvAction.setmobjorbit(mobj, point, prefs, lookat)
-
-	if not (mobj and mobj.valid) then return end -- no mobj
-
-	local xd = prefs.x*cos(prefs.dir+FixedAngle(prefs.rot*FRACUNIT))
-	local yd = prefs.y*sin(prefs.dir+FixedAngle(prefs.rot*FRACUNIT))
-	local zd = prefs.z
-
-
-	-- Use relative position setting, or absolute
-	if (prefs and prefs.rel) then
-		P_TeleportMove(mobj, mobj.x+point.x+xd, mobj.y+point.y+yd, mobj.z+point.z+zd)
-	else
-		P_TeleportMove(mobj, point.x+xd, point.y+yd, point.z+zd)
-	end
-
-	-- if lookat then mobj.angle = R_PointToAngle2(mobj.x, mobj.y, point.x, point.y)+($-R_PointToAngle2(mobj.x, mobj.y, point.x, point.y))/4 end
-	if lookat then mobj.angle = R_PointToAngle2(mobj.x, mobj.y, point.x, point.y) end
-end
-
--- Linear interpolation (might avoid a function conflict)
-function EvAction.lerp(a, b, t)
-	return a + FixedMul(b - a, t)
-end
-
-function EvAction.Distance3D(p1, p2)
-    return FixedHypot(FixedHypot(p1.x-p2.x, p1.y-p2.y), p1.z-p2.z)
-end
-
-function EvAction.Distance2D(p1, p2)
-    return FixedHypot(p1.x-p2.x, p1.y-p2.y)
-end
-
-local function bezier(delta, p1, p2)
-	-- first iteration
-	local p0 = FixedMul(p1, delta)
-	p1 = $ + FixedMul(p2-p1, delta)
-	p2 = $ + FixedMul(FRACUNIT-p2, delta)
-	
-	-- second iteration
-	p0 = $+FixedMul(p1-p0, delta)
-	p1 = $+FixedMul(p2-p1, delta)
-	
-	-- final pointp
-	return p0 + FixedMul(p1-p0, delta)
-end
-
--- TODO: deleteme
-function EvAction.mobjmoveto(event, mobj, point, speed, prefs)
-
-	if not (mobj and mobj.valid) then return end -- no mobj
-
-	-- TODO?: division by zero error fixed with +1 on dist below..but 
-	-- check and return if we reached point anyways?
-
-	local dist = FixedHypot(point.z-mobj.z, FixedHypot(point.x-mobj.x, point.y-mobj.y))+1
-	-- local dist = FixedHypot(FixedHypot(mobj.x-point.x, mobj.y-point.y), mobj.z-point.z)+1
-	local t_ang = R_PointToAngle2(mobj.x, mobj.y, point.x, point.y) -- The travel angle
-
-	local pct = FixedDiv(speed, dist)+1 -- percent to move per frame
-	-- pct = bezier(pct, 0, FRACUNIT)
-
-	-- Interpolate the constant movement on all axis based on the distance
-	local movex = EvAction.lerp(mobj.x, point.x, pct)
-	local movey = EvAction.lerp(mobj.y, point.y, pct)
-	local movez = EvAction.lerp(mobj.z, point.z, pct)
-
-	-- Move the object in an arc over its distance to the destination
-	-- TODO: why does this make the arc higher the further the distance?
-	if (prefs and prefs.arc) then
-		local ang = FixedMul(FixedMul(ANGLE_180, dist/speed), 26*FRACUNIT) -- dist/speed
-		-- print(string.format("distance: %d | pct: %d | ang: %f", dist/FRACUNIT, pct/FRACUNIT, ang))
-		-- movex = $-FixedMul(prefs.arc.x or 0, sin(ang))
-		-- movey = $-FixedMul(prefs.arc.y or 0, sin(ang))
-		movex = $+P_ReturnThrustX(nil, t_ang+ANGLE_90, FixedMul((prefs.arc.horz or 0), sin(ang)))
-		movey = $+P_ReturnThrustY(nil, t_ang+ANGLE_90, FixedMul((prefs.arc.horz or 0), sin(ang)))
-		movez = $-FixedMul((prefs.arc.vert or 0), sin(ang)) -- the same as d*sin(a)
-	end
-
-	-- Set mobj angle
-	mobj.angle = (prefs and prefs.angle) or mobj.angle
-
-	-- Apply the movement
-	P_TeleportMove(mobj, 
-		movex,
-		movey,
-		movez
-	)
-
-	-- Lock final position when done
-	-- TODO: jitters when 8 and hi-speed, is the distance to end dependent on speed too?
-	waitUntil(event, dist < speed/2 --[[8*FRACUNIT jitters]], function()
-		if not (prefs and prefs.nolock) then 
-			P_TeleportMove(mobj, point.x, point.y, point.z)
-		end
-
-		if (prefs and prefs.callback) then
-			prefs.callback(mobj)
-		end
-	end)
-	-- if dist < speed/2 then
-	-- 	return true
-	-- else
-	-- 	return false
-	-- end
-end
-
--- TODO: deleteme
-function EvAction.simplemove(event, mobj, point, speed, prefs)
-
-	local dist2d = P_AproxDistance(point.x - mobj.x, point.y - mobj.y)
-	-- print(dist2d)
-	P_InstaThrust(mobj, R_PointToAngle2(mobj.x, mobj.y, point.x, point.y), speed)
-
-	waitUntil(event, dist2d < speed/2 --[[8*FRACUNIT jitters]], function()
-		if not (prefs and prefs.nolock) then
-			mobj.momx = 0
-			mobj.momy = 0
-			P_TeleportMove(mobj, point.x, point.y, point.z)
-		end
-
-		if (prefs and prefs.callback) then
-			prefs.callback(mobj)
-		end
-	end)
-end
-
--- TODO: deleteme
-function EvAction.mobjmove2(event, mobj, point, speed, prefs)
-	
-
-	--[[local start = mobj
-	local finish = point
-	local arc = (prefs and prefs.arc)
-
-	--Get full distance from start to finish
-	local fulldist =
-		FixedHypot(start.z-finish.z,
-			FixedHypot(start.x-finish.x,start.y-finish.y)
-		)+1
-
-	--Get interpolation speed and distance %
-	if mobj.lerpspeed == nil or mobj.lerpdist == nil then
-		--Current Movespeed
-		local speed = FixedHypot(mobj.momz,FixedHypot(mobj.momx,mobj.momy))
-		mobj.lerpspeed = FixedDiv(speed,fulldist)
-		mobj.lerpdist = mobj.lerpspeed
-	end
-	local lerpspeed = mobj.lerpspeed
-	--Get distance from start
-	local traveldist = 
-		FixedHypot(start.z-mobj.z, 
-			FixedHypot(start.x-mobj.x, start.y-mobj.y)
-		)+1
-	
-	--Get new lerpdist based on interpolation amount increment
-	mobj.lerpdist = $+lerpspeed
-	
-	--Get lerped coordinate positions between start and finish
-	local x = EvAction.lerp(start.x,finish.x,mobj.lerpdist)
-	local y = EvAction.lerp(start.y,finish.y,mobj.lerpdist)
-	local z = EvAction.lerp(start.z,finish.z,mobj.lerpdist)
-	--Apply offset from arc
-	if prefs and prefs.arc then
-		local ang = FixedMul(ANGLE_180, mobj.lerpdist)
-		x = $+P_ReturnThrustX(nil,mobj.angle+ANGLE_90,FixedMul(arc.horz or 0,sin(ang)))
-		y = $+P_ReturnThrustY(nil,mobj.angle+ANGLE_90,FixedMul(arc.horz or 0,sin(ang)))
-		z = $-FixedMul(arc.vert or 0,sin(ang))
-	end
-	--Move to new position
-	P_TeleportMove(mobj,x,y,z)--]]
-
-	waitUntil(event, fulldist < mobj.lerpspeed/2 --[[8*FRACUNIT jitters]], function()
-		if not (prefs and prefs.nolock) then 
-			P_TeleportMove(mobj, point.x, point.y, point.z)
-		end
-
-		if (prefs and prefs.callback) then
-			prefs.callback(mobj)
-		end
-	end)
-end
-
--- Make the mobj look at a direction (in angles)
-function EvAction.mobjchangeangle(mobj, directionangle)
-	if not (mobj and mobj.valid) then return end -- no mobj
-	mobj.angle = directionangle
-end
-
--- Make the mobj look at another mobj or point
-function EvAction.mobjlookat(mobj, point)
-	if not (mobj and mobj.valid) then return end -- no mobj
-	mobj.angle = R_PointToAngle2(mobj.x, mobj.y, point.x, point.y)
-end
-
--- Get the direction of where to look at a mobj or point
-function EvAction.getlookangle(mobj, point)
-	if not (mobj and mobj.valid) then return end -- no mobj
-	return R_PointToAngle2(mobj.x, mobj.y, point.x, point.y)
-end
-
--- Set the mobj roll/rotation angle (or continuously add)
-function EvAction.setspriteroll(mobj, angle, addangle)
-	if not (mobj and mobj.valid) then return end -- no mobj
-	
-	if (addangle) then
-		mobj.rollangle = $1+angle
-	else
-		mobj.rollangle = angle
-	end
-end
-
-
+-- TODO: check to remove (or redo)
 -- Find a mobj in the gamemap (may be extremely slow) (missing redundant args)
 function EvAction.findmobj(mobjtype, prefs)
 	for mobj in mobjs.iterate() do
@@ -1130,6 +727,7 @@ function EvAction.findmobj(mobjtype, prefs)
 	end
 end
 
+-- TODO: (redo)
 -- A wrapper for creating a mobj with extra settings
 function EvAction.createmobj(mobjtype, point, prefs, callback)
 	local newmobj = P_SpawnMobj(point.x, point.y, point.z, mobjtype)
@@ -1150,6 +748,7 @@ function EvAction.createmobj(mobjtype, point, prefs, callback)
 	return newmobj
 end
 
+-- TODO: (redo)
 -- A wrapper for creating multiple mobjs in one go
 function EvAction.createmultimobjs(...)
 	local list = {}
@@ -1159,6 +758,7 @@ function EvAction.createmultimobjs(...)
 	return unpack(list)
 end
 
+-- TODO: (redo)
 -- Remove a mobj (using lists by default since its more efficient)
 function EvAction.removemobj2(mobjlist, fuse)
 	for i=1,#mobjlist do
@@ -1171,14 +771,6 @@ function EvAction.removemobj2(mobjlist, fuse)
 			P_RemoveMobj(mobjlist[i])
 		end
 	end
-	-- for _,entry in pairs(mobjlist) do
-		
-	-- 	if (fuse) then
-	-- 		entry.fuse = 35
-	-- 	else
-	-- 		P_RemoveMobj(entry)
-	-- 	end
-	-- end
 end
 
 -- ------------------------------------------------------
