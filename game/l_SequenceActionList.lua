@@ -911,7 +911,7 @@ function EvAction.coordinategetoffset(container, placement_name, offsetx, offset
 	return {x=anchor.x + offsetx, y=anchor.y + offsety, z=anchor.z + offsetz}
 end
 
--- Gets all UDMF objects whose first string argument contains a string
+-- Gets all UDMF objects that have stringargs (i forgot where this is used at and what it does)
 function EvAction.get_udmf_stringobjs()
 	local objects = {}
 	for mt in mapthings.iterate do

@@ -12,36 +12,72 @@ FrameAnim.playing = {}
 
 
 -- Adds a new animation to the playing animation list
-function FrameAnim.add(animname, animator, nsprite, startf, endf, args)
+function FrameAnim.add(animname, animator, nsprite, startf, endf, args, use_dupe)
 
 	-- Duplicate animation? Set it to be replaced immediately
-	for i,anim in ipairs(FrameAnim.playing) do
-		if (anim.name == animname) then
-			anim.deleted = true
+	if not (use_dupe) then
+		for i,anim in ipairs(FrameAnim.playing) do
+			if (anim.name == animname) then
+				anim.deleted = true
+			end
 		end
 	end
 
-	-- Start by setting the initial sprite and frame
-	animator.sprite = nsprite
-	animator.frame = R_Char2Frame(startf) --startf
-
-	-- Throw it into the playing list
-	table.insert(FrameAnim.playing, 
-	{
+	-- Create Animation Table
+	local anim = {
 		name=animname,
 		mobj=animator,
 		sprite=nsprite,
-		startframe=R_Char2Frame(startf), --startf,
-		endframe=R_Char2Frame(endf), --endf,
+		timer=0,
+		frame=R_Char2Frame(startf), --startf,
+		startframe=(args and args.loopframe and R_Char2Frame(args.loopframe)) or R_Char2Frame(startf), --startf,
+		endframe=R_Char2Frame(endf or startf), --endf,
 		loop=(args and args.loop) or ((R_Char2Frame(endf)-R_Char2Frame(startf)) * ((args and args.delay) or 1)), -- if no loop, set to end frame (ef*delay for slower animations)
+		forever=(args and args.loopalways),
 		frameskip=(args and args.frameskip) or 1, -- TODO: implement frameskip
 		delay=(args and args.delay) or 1,
 		flag=(args and args.flag) or 0, -- TODO: sprite flag that applies to separate frames. currently does not work.
 		-- spritelist = {}, -- TODO: separate flags per frame?
 		paused=false,
 		deleted=false,
-	})
+	}
+
+	-- Throw it into the playing list
+	table.insert(FrameAnim.playing, anim)
+
+	--Set object to these frames
+	animator.sprite = nsprite
+	animator.frame = anim.frame | anim.flag
+
 	-- print("Inserted Animation: "..animname)
+end
+
+-- add wrapper for spr2 animations
+function FrameAnim.addspr2(spr2animname, animator, spr2, framestart, frameend, animargs, use_dupe)
+
+	local skin = false -- animargs and animargs.skin
+
+	-- Set skin if given one (used for objects, not a good idea for players)
+	if skin then animator.skin = skin end
+
+	-- Set spr2 frame
+	animator.sprite2 = spr2
+
+	-- Super frame swapper
+	if animargs and animargs.super then
+		animator.sprite2 = $1 | FF_SPR2SUPER
+	end
+
+	-- TODO: report to issues: SPR2_STND cannot be accessed with skin.sprites[]
+	local maxframe = 0
+	if (spr2 == SPR2_STND) then
+		maxframe = frameend
+	else
+		maxframe = R_Frame2Char(skins[animator.skin].sprites[spr2].numframes-1)
+	end
+
+	-- FrameAnim.add("anim_spr2_play", player.mo, SPR_PLAY, framestart or "A", frameend or maxframe, animargs)
+	FrameAnim.add("anim_spr2_" .. spr2animname, animator, SPR_PLAY, framestart or "A", frameend or maxframe, animargs, use_dupe)
 end
 
 -- Seeks an animation and runs a function when found (also returns true if exists, false if not)
@@ -126,23 +162,28 @@ function FrameAnim.Thinker()
 
 				-- Set sprite
 				anim.mobj.sprite = anim.sprite
+				anim.mobj.frame = anim.frame | anim.flag
 
 				-- the animation is paused
 				if (anim.paused) then return end
 
-				if (anim.loop > 0) then
+				-- increase animation timer
+				anim.timer = $ + 1
+
+				-- loop on time, or loop forever
+				if (anim.loop > 0 or anim.forever) then
 
 					-- Play the sprite's frames by set speed and delay
-					if (leveltime % anim.delay == 0) then
-						anim.mobj.frame = ($1+1 * anim.frameskip)|anim.flag
+					if (anim.timer % anim.delay == 0) then
+						anim.frame = ($1+1 * anim.frameskip)
 					end
 
 					-- Reset the framecount to the beginning
-					if (anim.mobj.frame > anim.endframe) then
-						anim.mobj.frame = anim.startframe
+					if (anim.frame > anim.endframe) then
+						anim.frame = anim.startframe
 					end
 
-					anim.loop = $1-1
+					anim.loop = anim.forever and 1 or $1-1
 				else
 					-- When our sprite loop time has ended, set the animation to be removed
 					anim.deleted = true
@@ -150,17 +191,20 @@ function FrameAnim.Thinker()
 				end
 
 				--[[-- Play the sprite's frames by set speed and delay
-				if (leveltime % anim.delay == 0) then
-					anim.mobj.frame = $1+1 * anim.speed
+				if (anim.timer % anim.delay == 0) then
+					anim.frame = $1+1 * anim.speed
 				end
 
 				-- Reset the framecount to the beginning
-				if (anim.mobj.frame > anim.endframe) then
-					anim.mobj.frame = anim.startframe
+				if (anim.frame > anim.endframe) then
+					anim.frame = anim.startframe
 				end
 
+				-- Set sprite again
+				anim.mobj.frame = anim.frame | anim.flag
+
 				-- When our sprite loop time has ended, set the animation to be removed
-				if (anim.loop <= 0) then
+				if (anim.loop <= 0 and not anim.forever) then
 					anim.deleted = true
 					-- print("animation finished")
 					return

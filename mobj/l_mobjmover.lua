@@ -10,19 +10,21 @@
 rawset(_G, "MobjMover", {travelling={}})
 
 -- Sets up a new mover (pls be stable and worth using)
-function MobjMover.moveto(n, source, mtarget, args)
+function MobjMover.moveto(n, source, mtarget, args, usedupe)
 	
 	local dist = FixedHypot(mtarget.z-source.z, 
 				FixedHypot(mtarget.x-source.x, 
 				mtarget.y-source.y))
 
 	local tspeed = (args and args.speed) or 8*FU
-	local _movepercent = FixedDiv(tspeed, dist)
+	local _movepercent = FixedDiv(tspeed, dist+1)
 
 	-- End duplicates
-	for i,mover in ipairs(MobjMover.travelling) do
-		if (mover.name == n) then
-			mover.ended = true
+	if not (usedupe) then
+		for i,mover in ipairs(MobjMover.travelling) do
+			if (mover.name == n) then
+				mover.ended = true
+			end
 		end
 	end
 
@@ -33,9 +35,11 @@ function MobjMover.moveto(n, source, mtarget, args)
 		noangle=args and args.noangle,
 		startpos={x=source.x, y=source.y, z=source.z},
 		ease=args and args.ease or "linear",
-		arc=args and args.arc,
+		harc=((args and args.harc) and not nil) and args.harc or 0,
+		varc=((args and args.varc) and not nil) and args.varc or 0,
 		target=mtarget,
 		speed=tspeed,
+		locked=(args and args.locked),
 		movepercent=_movepercent,
 		movetime=0,
 		stopped=false,
@@ -96,8 +100,8 @@ end
 if MobjMover.EventExists() then
 
 	-- Check if an object is still moving
-	function MobjMover.waitmovedone(event, n)
-		if (MobjMover.ismoving(n) and MobjMover.EventExists()) then Event.pause(event) else Event.resume(event) end
+	function MobjMover.waitmovedone(event, n, callback)
+		if (MobjMover.ismoving(n) and MobjMover.EventExists()) then Event.pause(event) else Event.resume(event) if (callback) then callback(event.vars) end end
 	end
 
 	-- Sets a mobj moveto target with the ability to stop an event
@@ -145,9 +149,12 @@ function MobjMover.Thinker()
 		if (mover and not mover.ended) then
 
 			-- Lock to final target position and end the movement
-			if (mover.movetime > FRACUNIT) then
+			if (mover.movetime >= FRACUNIT) then
 				-- TODO: run a net-safe callback when ended?
-				P_TeleportMove(mover.mobj, mover.target.x, mover.target.y, mover.target.z)
+				if not (mover.locked) then
+					-- Locks the object to it's final position for safety
+					P_SetOrigin(mover.mobj, mover.target.x, mover.target.y, mover.target.z) -- (2.2.11 interpolation patch)
+				end
 				mover.ended = true
 				return
 			end
@@ -168,22 +175,43 @@ function MobjMover.Thinker()
 			local moveangle = R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
 
 			-- Set mobj angle (if only a number exists :v)
-			if (type(mover.angle) == "number") then
+			if (mover.noangle) then
+				mover.mobj.angle = (mover.angle and not nil) and $1 or $1
+			else
+				mover.mobj.angle = (mover.angle and not nil) and $1 or moveangle --R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
+			end
+			--[[if (type(mover.angle) == "number") then
 				mover.mobj.angle = mover.noangle and $1 or mover.angle
 			else
 				mover.mobj.angle = mover.noangle and $1 or R_PointToAngle2(mover.mobj.x, mover.mobj.y, mover.target.x, mover.target.y)
-			end
+			end--]]
 
-			-- Move in an arc motion horizontally or vertically
-			if mover.arc then
-				local ang = FixedMul(ANGLE_180, mover.movetime)
-				movex = $+P_ReturnThrustX(nil, moveangle + ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
-				movey = $+P_ReturnThrustY(nil, moveangle + ANGLE_90, FixedMul((mover.arc.horz or 0), sin(ang)))
-				movez = $-FixedMul(mover.arc.vert or 0, sin(ang))
+			-- Move in a curve motion horizontally or vertically
+			-- 12/15/2022: having two separate values instead of a table which can be invalidated at any time is better
+			if (mover.harc or mover.varc) then
+				local harc = mover.harc or 0
+				local varc = mover.varc or 0
+				local arcAngle = R_PointToAngle2(mover.startpos.x, mover.startpos.y, mover.target.x, mover.target.y)
+
+				-- Get current angle for our movetime, eased to the easing type
+				local ang = ease[mover.ease](mover.movetime, FRACUNIT)
+				ang = FixedMul(ANGLE_180, $)
+				ang = sin($)
+
+				-- Apply horizontal and vertical arc movements
+				local arcX = P_ReturnThrustX(nil, arcAngle + ANGLE_90, FixedMul(harc, ang))
+				local arcY = P_ReturnThrustY(nil, arcAngle + ANGLE_90, FixedMul(harc, ang))
+				local arcZ = -FixedMul(varc, ang)
+
+				-- Update the position
+				movex = movex + arcX
+				movey = movey + arcY
+				movez = movez + arcZ
 			end
 
 			-- Apply the movement
-			P_TeleportMove(mover.mobj, 
+			-- (2.2.11 interpolation patch)
+			P_MoveOrigin(mover.mobj,
 				movex,
 				movey,
 				movez
@@ -230,7 +258,7 @@ end)--]]
 		sd.tics = FU
 		sd.sprite = SPR_DRWN
 		sd.scale = 2*FU
-		MobjMover.moveto("test", server.mo.s, {x=0,y=2000*FU,z=56*FU}, {arc={vert=128*FU}})
+		MobjMover.moveto("test", server.mo.s, {x=0,y=2000*FU,z=56*FU}, {varc=128*FU})
 	end
 	-- Pauses movement for 3 seconds
 	if (leveltime == 10*TICRATE) then
