@@ -602,6 +602,22 @@ function EvAction.movemobjrelative(mobj, rx, ry, rz, interpolate)
 	-- P_MoveOrigin(mobj, ax + rx, ay + ry, az + rz)
 end
 
+-- Moves a mobj relative to another mobj's position and angle
+function EvAction.moveobjectrelative(mobj, relmobj, offx, offy, offz, offang, interpolate)
+
+	local warporigin = interpolate and P_MoveOrigin or P_SetOrigin -- or P_TeleportMove
+
+	warporigin(mobj,
+		relmobj.x + P_ReturnThrustX(relmobj.angle+(offang or 0), offy) + offx,
+		relmobj.y + P_ReturnThrustY(relmobj.angle+(offang or 0), offy),
+		relmobj.z + offz)
+
+	-- old (For reference)
+	-- 	c.camera_ref.x + P_ReturnThrustX(c.camera_ref.angle, c.offy)+c.offx,
+	-- 	c.camera_ref.y + P_ReturnThrustY(c.camera_ref.angle, c.offy),
+	-- 	c.camera_ref.z + c.offz)
+end
+
 -- Rotates a mobj around a center point in 3D space
 function EvAction.rotatearound(mobj, center, radius, yaw, pitch)
 	if not (mobj and mobj.valid) or not center then return end
@@ -615,6 +631,19 @@ function EvAction.rotatearound(mobj, center, radius, yaw, pitch)
 	local z = center.z + FixedMul(radius, sin(pitch))
 
 	P_MoveOrigin(mobj, x, y, z)
+end
+
+-- Returns coordinates in a circle around a centerpoint's radius
+function EvAction.makecirclepoints(centerpoint, distance, startangle, skipangle, maxangle)
+	local t = {}
+	for degrees=0, maxangle or 360, skipangle or 45 do
+		table.insert(t, {
+			x=centerpoint.x+P_ReturnThrustX((startangle or 0)+FixedAngle(degrees*FU), distance),
+			y=centerpoint.y+P_ReturnThrustY((startangle or 0)+FixedAngle(degrees*FU), distance),
+			z=centerpoint.z,
+		})
+	end
+	return t
 end
 
 -- Event action wrapper for changing the mobj sprite (+frame)
@@ -723,6 +752,75 @@ function EvAction.stopmobjmomentum(mobj)
 	mobj.momz = 0
 end
 
+-- Throws an object at a target that also accounts for the height of the target
+function EvAction.tossobject(spawner, target, firespeed, objecttype, scale, args)
+
+	if not EvAction.IsValidMobj(spawner) then return end
+
+	-- offset z (height)
+	local offz = (args and args.hz ~= 0) and args.hz or 0
+
+	-- offset individual object angle
+	local offa = (args and args.angle ~= 0) and args.angle or 0
+
+	-- offset rotation angle and distance
+	local offrang = (args and args.rangle ~= 0) and args.rangle or 0
+	local offdst = (args and args.disto ~= 0) and args.disto or 0
+
+	local zmove = (args and args.zmove) and args.zmove or false
+
+	-- use target (or directly in front if none)
+	if not target then
+		target = {
+			x=spawner.x + FixedMul(P_ReturnThrustX(spawner.angle + offrang, spawner.radius + 96*FRACUNIT), spawner.scale),
+			y=spawner.y + FixedMul(P_ReturnThrustY(spawner.angle + offrang, spawner.radius + 96*FRACUNIT), spawner.scale),
+			z=spawner.z + FixedMul(offz, spawner.scale),
+			valid=true,
+		}
+	end
+
+	-- adjust scale and tossed mobj spawn
+	local ssx = spawner.x + FixedMul(P_ReturnThrustX(spawner.angle + offrang, offdst), spawner.scale)
+	local ssy = spawner.y + FixedMul(P_ReturnThrustY(spawner.angle + offrang, offdst), spawner.scale)
+	local ssz = spawner.z + FixedMul(offz, spawner.scale)
+
+	local tossed = P_SpawnMobj(
+		ssx,
+		ssy,
+		ssz,
+		objecttype)
+
+	-- set scale
+	tossed.scale = scale or FU
+
+	tossed.fuse = (args and args.fuse) or 6*TICRATE
+
+	-- Adjust speed to scale
+	local speed = FixedMul(firespeed, spawner.scale)
+
+	-- determines if the object should track z height or act like a normal shot
+	if (zmove) then
+
+		-- Set fired mobj momentum in the direction of the target
+		local a = R_PointToAngle2(ssx, ssy, target.x, target.y)
+
+		tossed.angle = a + offa -- offset angle
+		tossed.momx = FixedMul(speed, cos(a))
+		tossed.momy = FixedMul(speed, sin(a))
+
+		-- Set fired z momentum in the direction of the target z position
+		local dist = P_AproxDistance(target.x - ssx, target.y - ssy) / speed + 1
+		tossed.momz = (target.z-ssz) / dist
+		-- tossed.flags = $|MF_GRENADEBOUNCE|MF_BOUNCES
+	else
+		local a = (target) and R_PointToAngle2(ssx, ssy, target.x, target.y) or R_PointToAngle2(tossed.x, tossed.y, target.x, target.y)
+
+		tossed.angle = a + offa
+		P_InstaThrust(tossed, tossed.angle, speed)
+	end
+	return tossed
+end
+
 -- TODO: check to remove (or redo)
 -- Find a mobj in the gamemap (may be extremely slow) (missing redundant args)
 function EvAction.findmobj(mobjtype, prefs)
@@ -811,6 +909,24 @@ function EvAction.coordinategetoffset(container, placement_name, offsetx, offset
 	local anchor = container["mo_" .. placement_name]
 
 	return {x=anchor.x + offsetx, y=anchor.y + offsety, z=anchor.z + offsetz}
+end
+
+-- Gets all UDMF objects whose first string argument contains a string
+function EvAction.get_udmf_stringobjs()
+	local objects = {}
+	for mt in mapthings.iterate do
+		if (mt.stringargs and mt.stringargs[0] and string.len(mt.stringargs[0]) > 0) and (mt and mt.valid) then
+			-- print("Added:" .. mt.stringargs[0])
+			objects[mt.stringargs[0]] = {
+				x = mt.mobj.x,
+				y = mt.mobj.y,
+				z = mt.mobj.z,
+				angle = mt.mobj.angle,
+				tag = mt.tag
+			}
+		end
+	end
+	return objects
 end
 
 -- ------------------------------------------------------
@@ -1121,3 +1237,11 @@ function EvAction.seenamesoff(player, seenplayer)
 	end
 end
 
+-- Hides player names when event camera is active
+addHook("SeenPlayer", EvAction.seenamesoff)
+
+
+-- Draw the HUD stuff during gameplay and on the scores screen
+for _,hudtype in pairs({"game", "scores"}) do
+	hud.add(EvAction.hudcontrol, hudtype)
+end

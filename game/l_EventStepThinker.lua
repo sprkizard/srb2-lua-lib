@@ -627,5 +627,7 @@ addHook("MapChange", function()
 end)
 
 addHook("LinedefExecute", Event.LinedefExecute, "RUN_EVS")
+addHook("LinedefExecute", Event.LinedefExecute, "RUNSEQ")
 
--- addHook("ThinkFrame", Event.RunEvents)
+-- Progresses all active events
+addHook("ThinkFrame", Event.RunEvents)
