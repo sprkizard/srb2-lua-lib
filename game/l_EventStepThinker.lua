@@ -6,8 +6,16 @@
 	Pokémon Mystery Dungeon: Gates to Infinity.
 	(Inspired by a script made by fickleheart and D00D64)
 
-* Usage: TODO: check wiki???
-
+	-- TODO: please fix this later. I don't remember what it was for anymore.
+	-- Creates a new Sequence definition.
+	-- @arg1 (string) The identifier for the sequence.
+	-- @arg2 (table) A list of functions to run in order
+	--
+	-- Function arguments:
+	-- 1. vars var (table): Variable storage for this specific sequence instance.
+	-- 2. seq s (object): The sequence object. (v is already used for drawing internally, so I changed it to be safe...)
+	-- 3. caller c (mobj_t|player_t|nil): The triggerer of the sequence.
+	function Sequence.new(name, steps) end
 * Depends on:
 
 ]]
@@ -208,18 +216,16 @@ function Event.__endEvent(ev)
 end
 
 
--- TODO: find a new use for this since anonymous functions are dead
--- Creates a userdata block'name' (usually when printed from tostring)
---[[local function randomUserBlockName()
-	local str = "0"
-	for i=1,7 do
-		-- Randomize
-		local bits = {P_RandomRange(65,70), P_RandomRange(48,57)}
-		local RandomKey = P_RandomRange(1, #bits)
-		str = str .. string.char(bits[RandomKey])
-	end
-	return str
-end--]]
+-- Generates a random identifier
+-- local function generateRandomID(prefix)
+-- 	local str = prefix or ""
+-- 	for i=1,7 do
+-- 		local bits = {P_RandomRange(65,70), P_RandomRange(48,57)}
+-- 		local RandomKey = P_RandomRange(1, #bits)
+-- 		str = str .. string.char(bits[RandomKey])
+-- 	end
+-- 	return str
+-- end
 
 -- Runs an event
 function Event.start(eventname, args, caller)

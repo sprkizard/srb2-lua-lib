@@ -602,6 +602,21 @@ function EvAction.movemobjrelative(mobj, rx, ry, rz, interpolate)
 	-- P_MoveOrigin(mobj, ax + rx, ay + ry, az + rz)
 end
 
+-- Rotates a mobj around a center point in 3D space
+function EvAction.rotatearound(mobj, center, radius, yaw, pitch)
+	if not (mobj and mobj.valid) or not center then return end
+
+	yaw = FixedAngle(yaw or 0)
+	pitch = FixedAngle(pitch or 0)
+
+	-- Calculate new position
+	local x = center.x + FixedMul(FixedMul(radius, cos(yaw)), cos(pitch))
+	local y = center.y + FixedMul(FixedMul(radius, sin(yaw)), cos(pitch))
+	local z = center.z + FixedMul(radius, sin(pitch))
+
+	P_MoveOrigin(mobj, x, y, z)
+end
+
 -- Event action wrapper for changing the mobj sprite (+frame)
 function EvAction.setmobjsprite(mobj, newsprite, newframe)
 
