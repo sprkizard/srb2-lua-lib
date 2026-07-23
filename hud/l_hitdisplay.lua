@@ -14,6 +14,16 @@ rawset(_G, "HitDisplay", {})
 
 local health_tab = {}
 
+-- Checks if a mobj is valid. Base is used if a custom health struct is used
+-- and the base mobj it's a part of cannot be reached normally.
+function HitDisplay.hitmobjvalid(mo, basemo)
+	if (basemo) then
+		if (basemo and basemo.valid) then return true else return false end
+	else
+		if (mo and mo.valid) then return true else return false end
+	end
+end
+
 
 local function altval(v, av)
 	return (v and not nil) and v or av
@@ -31,6 +41,7 @@ function HitDisplay.shownew(mo, disparg)
 	disparg = altval(disparg, {})
 
 	disp["mobj"] = mo
+	disp["basemobj"] = disparg.basemobj -- (For custom health structs with no way to access the actual mobj)
 	disp["identifier"] = disparg.identifier or "hitdisplay"
 	-- Drawing Origin
 	disp["drawx"] = altval(disparg.drawx, 8)
@@ -55,6 +66,7 @@ function HitDisplay.shownew(mo, disparg)
 
 	-- removes meter on 0 automatically
 	disp["removeonempty"] = disparg.removeonempty
+	disp["removed"] = false
 
 	-- Hurt timer tree reference variable / sliding damage value
 	disp["hurtref"] = disparg.hurtref
@@ -106,13 +118,17 @@ function HitDisplay.sethealth(mobj, newhealth, relative)
 	end
 end
 
+-- Hud hook for graphic display
 function HitDisplay.meterdisplay(v, stplyr)
 
 	for i=1, #health_tab do
+		(function()
 		local meow = health_tab[i]
 
-		-- automatic removal on empty (TODO: thinkframe?)
-		if meow.removeonempty and meow.mobj.health <= 0 then table.remove(health_tab, i) end
+		if not health_tab[i] then return end -- skip nonexisting structs
+
+		-- -- automatic removal on empty (TODO: thinkframe?)
+		-- if meow and meow.removeonempty and meow.mobj.health <= 0 then table.remove(health_tab, i) end
 
 		-- Drawing start origin
 		local startx = meow.drawx
@@ -141,11 +157,11 @@ function HitDisplay.meterdisplay(v, stplyr)
 		v.drawStretched(FU*hpx, FU*hpy, FU*(meow.boxwidth), FU*meow.boxheight, enemyempty_g, meow.hpempty_flags, v.getColormap(1))
 
 		-- Reference damage to ease to when damage is added or subtracted (Hurt timer mandatory)
-		if meow.dmgref < meow.mobj.health and not meow.mobj[meow.hurtref] then
-			meow.dmgref = $ + 1
-		elseif meow.dmgref > meow.mobj.health and not meow.mobj[meow.hurtref] then
-			meow.dmgref = $ - 1
-		end
+		-- if meow.dmgref < meow.mobj.health and not meow.mobj[meow.hurtref] then
+		-- 	meow.dmgref = $ + 1
+		-- elseif meow.dmgref > meow.mobj.health and not meow.mobj[meow.hurtref] then
+		-- 	meow.dmgref = $ - 1
+		-- end
 
 		-- Damage color (Reference)
 		v.drawStretched(FU*hpx, FU*hpy, abs(dmgfillwidth), FU*meow.boxheight, enemyhurt_g, 0, v.getColormap(1))
@@ -163,19 +179,19 @@ function HitDisplay.meterdisplay(v, stplyr)
 		
 
 		-- Fill startup
-		if (meow.fillref < meow.mobj.health and meow.setup)
+		if (meow.fillref < meow.mobj.health and meow.setup) then
 
 			-- Scales amount based on boxwidth and maximum health
 			-- TODO: properly insert formula to account for values > 45, < 45 to fill 1.2 seconds evenly
-			meow.fillref = $1+(1+(meow.maxhealth/meow.boxwidth)*2)
+			-- meow.fillref = $1+(1+(meow.maxhealth/meow.boxwidth)*2)
 
 			-- Sound plays at different rate
-			if (leveltime*2) % 5 < 2 then S_StartSound(nil, meow.displaysound, stplyr) end
+			-- if (leveltime*2) % 5 < 2 then S_StartSound(nil, meow.displaysound, stplyr) end
 
 			v.drawStretched(FU*hpx, FU*hpy, FU*(meow.boxwidth), FU*meow.boxheight, enemyempty_g, 0, v.getColormap(1))
 			v.drawStretched(FU*hpx, FU*hpy, FU*(meow.fillref*meow.boxwidth/meow.maxhealth), FU*meow.boxheight, enemyfill_g, 0, v.getColormap(1))
 			
-			meow.setup = (meow.fillref > meow.mobj.health) and false or true
+			-- meow.setup = (meow.fillref > meow.mobj.health) and false or true
 		end
 
 		-- v.drawFill(320/2, 160/2, (meow.extra and meow.mobj[meow.extra].health or meow.mobj.health), 6, 35)
@@ -183,6 +199,51 @@ function HitDisplay.meterdisplay(v, stplyr)
 
 		-- v.drawString(96, 96, string.format("%d / %d", meow.mobj.health, meow.maxhealth), 0, "left")
 		-- v.drawString(96, 96, ((leveltime*2) % 5), 0, "left")
+		end)()
+	end
+end
+
+-- Update hook for thinkframe logic
+function HitDisplay.meterupdate()
+	for i=1, #health_tab do
+		(function()
+		local meow = health_tab[i]
+
+		if not health_tab[i] then return end -- skip nonexisting structs
+
+		-- remove non-valid or removable entries
+		if (meow.removed) then
+			table.remove(health_tab, i)
+		end
+
+		-- no mobj / basemobj means to not continue
+		if not HitDisplay.hitmobjvalid(meow.mobj, meow.basemobj) then
+			meow.removed = true
+		end
+
+		-- automatic removal on empty
+		if meow.removeonempty and meow.mobj.health <= 0 then meow.removed = true return end
+		-- Reference damage to ease to when damage is added or subtracted (Hurt timer mandatory)
+		if meow.dmgref < meow.mobj.health and not meow.mobj[meow.hurtref] then
+			meow.dmgref = $ + 1
+		elseif meow.dmgref > meow.mobj.health and not meow.mobj[meow.hurtref] then
+			meow.dmgref = $ - 1
+		end
+
+		-- Fill startup
+		if (meow.fillref < meow.mobj.health and meow.setup) then
+
+			-- Scales amount based on boxwidth and maximum health
+			-- TODO: properly insert formula to account for values > 45, < 45 to fill 1.2 seconds evenly
+			meow.fillref = $1+(1+(meow.maxhealth/meow.boxwidth)*2)
+
+			-- Sound plays at different rate
+			if (leveltime*2) % 5 < 2 then S_StartSound(nil, meow.displaysound, displayplayer) end
+
+			meow.setup = (meow.fillref > meow.mobj.health) and false or true
+		end
+
+		end)()
 	end
 end
 
@@ -196,4 +257,5 @@ hud.add(HitDisplay.meterdisplay, "game")
 addHook("MapLoad", HitDisplay.clearall)
 addHook("MapChange", HitDisplay.clearall)
 addHook("NetVars", HitDisplay.netvars)
+addHook("ThinkFrame", HitDisplay.meterupdate)
 
