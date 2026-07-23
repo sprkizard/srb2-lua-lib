@@ -159,7 +159,7 @@ function Event.new(eventname, ftable)
 	_event.status = "normal" -- mimic coroutine statuses (dead|suspended|running|normal)
 	_event.step = 1 -- the current step position in the state list (might be easier than for-do?)
 	_event.signal = "" -- signal to wait on if given one
-	_event.tags = {} -- Tags for jumping around inside of a state (like goto)
+	_event.loops = {} -- Loops for jumping around inside of a state
 	_event.sleeptime = 0 -- the event wait timer
 	_event.looptrack = 0 -- the event looptracker (can be used for anything eg. doOnce)
 
@@ -179,7 +179,7 @@ function Event.new(eventname, ftable)
 			
 			-- Sub-Events in the ftable should be added into the subevents table separately
 			-- (they will inherit the parent event's variables, etc but still act independently)
-			local _subevent = {name=k,status="normal",step=1,signal="",vars={},tags={},sleeptime=0,looptrack=0,states={}}
+			local _subevent = {name=k,status="normal",step=1,signal="",vars={},loops={},sleeptime=0,looptrack=0,states={}}
 
 			-- add the functions to the state list with arguments (container, subevent, [parentevent])
 			for i=1,#v do
@@ -203,7 +203,7 @@ function Event.__setupEvent(ev, eventname)
 	ev.status = "running"
 	ev.step = EventList[eventname].step
 	ev.signal = EventList[eventname].signal
-	ev.tags = {}
+	ev.loops = {}
 	ev.sleeptime = EventList[eventname].sleeptime
 	ev.looptrack = EventList[eventname].looptrack
 	ev.vars = {}
@@ -343,27 +343,27 @@ function Event.getcurrentstate(event, stepnum)
 	return event.step
 end
 
--- Sets a tag inside of the state
-function Event.settag(event, tagname)
-	event.tags[tagname] = event.step
+-- Sets a loop inside of the state
+function Event.setloop(event, loopname)
+	event.loops[loopname] = event.step
 	
-	Event.printdebug(string.format("\x82 -------[%s]: Set loop at Step %d-------", tagname, event.step))
+	Event.printdebug(string.format("\x82 -------[%s]: Set loop at Step %d-------", loopname, event.step))
 	
 	return event.step
 end
 
--- Go to the tag number given in the current state
-function Event.gototag(event, tagname)
-	event.step = event.tags[tagname]
+-- Go to the loop number given in the current state
+function Event.gotoloop(event, loopname)
+	event.step = event.loops[loopname]
 	event.status = "looped"
 
-	Event.printdebug(string.format("\x82 -------[%s]: Returning to Step %d-------", tagname, event.tags[tagname] or -1))
+	Event.printdebug(string.format("\x82 -------[%s]: Returning to Step %d-------", loopname, event.loops[loopname] or -1))
 end
 
--- Go to a tag number if a condition is reached
-function Event.gototaguntil(event, tagname, cond)
+-- Go to a loop number if a condition is reached
+function Event.gotoloopuntil(event, loopname, cond)
 	if not (cond) then
-		Event.gototag(event, tagname)
+		Event.gotoloop(event, loopname)
 	else
 		-- do nothing
 	end
@@ -571,13 +571,13 @@ end
 This is the structure of each container with fields we allow to be accessed:
 EventList: 
 {
-	name: {name, status, step, signal, tags, sleeptime, looptrack, vars{}, x--states{...}},
+	name: {name, status, step, signal, loops, sleeptime, looptrack, vars{}, x--states{...}},
 	...
 }
 
 Running:
 {
-	{name, status, step, signal, tags, sleeptime, looptrack, x--states{...}},
+	{name, status, step, signal, loops, sleeptime, looptrack, x--states{...}},
 	...
 }
 
